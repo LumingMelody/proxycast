@@ -58,6 +58,9 @@ ProxyCast 是一款基于 Tauri 2.0 + React 18 + Rust 构建的跨平台桌面�
 ### Provider 管理 - 凭证配置与切换
 ![Providers](docs/images/80084116-b822-4aa3-821a-bcfb8864189a.png)
 
+### 模型列表 - 可用模型查看
+![Models](docs/images/38d55905-2b45-42fa-9aef-70f75f8b019f.png)
+
 ### 设置页面 - 服务器配置
 ![Settings](docs/images/98e9b6a0-3c48-430e-9c88-220f11e9b94d.png)
 
