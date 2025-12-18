@@ -522,12 +522,13 @@ pub fn get_default_check_model(provider_type: PoolProviderType) -> &'static str 
         PoolProviderType::Gemini => "gemini-2.5-flash",
         PoolProviderType::Qwen => "qwen3-coder-flash",
         PoolProviderType::OpenAI => "gpt-3.5-turbo",
-        PoolProviderType::Claude => "claude-3-5-haiku-latest",
+        // 使用 claude-sonnet-4-5-20250929，兼容更多代理服务器
+        PoolProviderType::Claude => "claude-sonnet-4-5-20250929",
         PoolProviderType::Antigravity => "gemini-3-pro-preview",
         PoolProviderType::Vertex => "gemini-2.0-flash",
         PoolProviderType::GeminiApiKey => "gemini-2.5-flash",
         PoolProviderType::Codex => "gpt-4o-mini",
-        PoolProviderType::ClaudeOAuth => "claude-3-5-haiku-latest",
+        PoolProviderType::ClaudeOAuth => "claude-sonnet-4-5-20250929",
         PoolProviderType::IFlow => "deepseek-chat",
     }
 }
@@ -558,6 +559,10 @@ pub struct CredentialDisplay {
     pub updated_at: String,
     /// 凭证来源（手动添加/导入/私有）
     pub source: CredentialSource,
+    /// API Key 凭证的 base_url（仅用于 OpenAI/Claude API Key 类型）
+    pub base_url: Option<String>,
+    /// API Key 凭证的完整 api_key（仅用于 OpenAI/Claude API Key 类型，用于编辑）
+    pub api_key: Option<String>,
 }
 
 /// 获取凭证类型字符串
@@ -593,6 +598,24 @@ pub fn get_oauth_creds_path(cred: &CredentialData) -> Option<String> {
         CredentialData::ClaudeOAuth { creds_file_path } => Some(creds_file_path.clone()),
         CredentialData::IFlowOAuth { creds_file_path } => Some(creds_file_path.clone()),
         CredentialData::IFlowCookie { creds_file_path } => Some(creds_file_path.clone()),
+        _ => None,
+    }
+}
+
+/// 从 CredentialData 中提取 base_url（仅适用于 API Key 类型）
+fn get_base_url(cred: &CredentialData) -> Option<String> {
+    match cred {
+        CredentialData::OpenAIKey { base_url, .. } => base_url.clone(),
+        CredentialData::ClaudeKey { base_url, .. } => base_url.clone(),
+        _ => None,
+    }
+}
+
+/// 从 CredentialData 中提取 api_key（仅适用于 API Key 类型）
+fn get_api_key(cred: &CredentialData) -> Option<String> {
+    match cred {
+        CredentialData::OpenAIKey { api_key, .. } => Some(api_key.clone()),
+        CredentialData::ClaudeKey { api_key, .. } => Some(api_key.clone()),
         _ => None,
     }
 }
@@ -633,6 +656,8 @@ impl From<&ProviderCredential> for CredentialDisplay {
             created_at: cred.created_at.to_rfc3339(),
             updated_at: cred.updated_at.to_rfc3339(),
             source: cred.source,
+            base_url: get_base_url(&cred.credential),
+            api_key: get_api_key(&cred.credential),
         }
     }
 }

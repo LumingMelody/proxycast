@@ -3454,13 +3454,51 @@ async fn call_provider_anthropic(
             }
         }
         CredentialData::ClaudeKey { api_key, base_url } => {
+            // 打印 Claude 代理 URL 用于调试
+            let actual_base_url = base_url.as_deref().unwrap_or("https://api.anthropic.com");
             let claude = ClaudeCustomProvider::with_config(api_key.clone(), base_url.clone());
+            let request_url = claude.get_base_url();
+            state.logs.write().await.add(
+                "info",
+                &format!(
+                    "[CLAUDE] 使用 Claude API 代理: base_url={} -> {}/v1/messages credential_uuid={}",
+                    actual_base_url,
+                    request_url,
+                    &credential.uuid[..8]
+                ),
+            );
+            // 打印请求参数
+            let request_json = serde_json::to_string(request).unwrap_or_default();
+            state.logs.write().await.add(
+                "debug",
+                &format!(
+                    "[CLAUDE] 请求参数: {}",
+                    &request_json.chars().take(500).collect::<String>()
+                ),
+            );
             match claude.call_api(request).await {
                 Ok(resp) => {
                     let status = resp.status();
+                    // 打印响应状态
+                    state.logs.write().await.add(
+                        "info",
+                        &format!(
+                            "[CLAUDE] 响应状态: status={} model={}",
+                            status,
+                            request.model
+                        ),
+                    );
                     match resp.text().await {
                         Ok(body) => {
                             if status.is_success() {
+                                // 打印响应内容预览
+                                state.logs.write().await.add(
+                                    "debug",
+                                    &format!(
+                                        "[CLAUDE] 响应内容: {}",
+                                        &body.chars().take(500).collect::<String>()
+                                    ),
+                                );
                                 // 记录成功
                                 if let Some(db) = &state.db {
                                     let _ = state.pool_service.mark_healthy(
@@ -3482,6 +3520,14 @@ async fn call_provider_anthropic(
                                             .into_response()
                                     })
                             } else {
+                                state.logs.write().await.add(
+                                    "error",
+                                    &format!(
+                                        "[CLAUDE] 请求失败: status={} body={}",
+                                        status,
+                                        &body.chars().take(200).collect::<String>()
+                                    ),
+                                );
                                 if let Some(db) = &state.db {
                                     let _ = state.pool_service.mark_unhealthy(
                                         db,
@@ -3498,6 +3544,10 @@ async fn call_provider_anthropic(
                             }
                         }
                         Err(e) => {
+                            state.logs.write().await.add(
+                                "error",
+                                &format!("[CLAUDE] 读取响应失败: {}", e),
+                            );
                             if let Some(db) = &state.db {
                                 let _ = state.pool_service.mark_unhealthy(
                                     db,
@@ -3815,6 +3865,13 @@ async fn call_provider_openai(
             }
         }
         CredentialData::ClaudeKey { api_key, base_url } => {
+            // 打印 Claude 代理 URL 用于调试
+            let actual_base_url = base_url.as_deref().unwrap_or("https://api.anthropic.com");
+            tracing::info!(
+                "[CLAUDE] 使用 Claude API 代理: base_url={} credential_uuid={}",
+                actual_base_url,
+                &credential.uuid[..8]
+            );
             let claude = ClaudeCustomProvider::with_config(api_key.clone(), base_url.clone());
             match claude.call_openai_api(request).await {
                 Ok(resp) => Json(resp).into_response(),
@@ -4504,6 +4561,13 @@ async fn call_provider_openai_for_ws(
             }
         }
         CredentialData::ClaudeKey { api_key, base_url } => {
+            // 打印 Claude 代理 URL 用于调试
+            let actual_base_url = base_url.as_deref().unwrap_or("https://api.anthropic.com");
+            tracing::info!(
+                "[CLAUDE] 使用 Claude API 代理: base_url={} credential_uuid={}",
+                actual_base_url,
+                &credential.uuid[..8]
+            );
             let provider = ClaudeCustomProvider::with_config(api_key.clone(), base_url.clone());
             match provider.call_openai_api(request).await {
                 Ok(result) => {
@@ -4609,6 +4673,13 @@ async fn call_provider_anthropic_for_ws(
 
     match &credential.credential {
         CredentialData::ClaudeKey { api_key, base_url } => {
+            // 打印 Claude 代理 URL 用于调试
+            let actual_base_url = base_url.as_deref().unwrap_or("https://api.anthropic.com");
+            tracing::info!(
+                "[CLAUDE] 使用 Claude API 代理: base_url={} credential_uuid={}",
+                actual_base_url,
+                &credential.uuid[..8]
+            );
             let provider = ClaudeCustomProvider::with_config(api_key.clone(), base_url.clone());
             let resp = match provider.call_api(request).await {
                 Ok(r) => r,

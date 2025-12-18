@@ -129,6 +129,10 @@ export interface CredentialDisplay {
   updated_at: string;
   // 凭证来源（手动添加/导入/私有）
   source: CredentialSource;
+  // API Key 凭证的 base_url（仅用于 OpenAI/Claude API Key 类型）
+  base_url?: string;
+  // API Key 凭证的完整 api_key（仅用于 OpenAI/Claude API Key 类型，用于编辑）
+  api_key?: string;
 }
 
 // Pool statistics

@@ -137,8 +137,9 @@ impl ProviderPoolService {
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Credential not found: {}", uuid))?;
 
+        // 处理 name：空字符串表示清除，None 表示不修改
         if let Some(n) = name {
-            cred.name = Some(n);
+            cred.name = if n.is_empty() { None } else { Some(n) };
         }
         if let Some(d) = is_disabled {
             cred.is_disabled = d;
@@ -146,8 +147,9 @@ impl ProviderPoolService {
         if let Some(c) = check_health {
             cred.check_health = c;
         }
+        // 处理 check_model_name：空字符串表示清除，None 表示不修改
         if let Some(m) = check_model_name {
-            cred.check_model_name = Some(m);
+            cred.check_model_name = if m.is_empty() { None } else { Some(m) };
         }
         if let Some(models) = not_supported_models {
             cred.not_supported_models = models;
@@ -667,22 +669,32 @@ impl ProviderPoolService {
     }
 
     // OpenAI API 健康检查
+    // 与 OpenAI Provider 保持一致的 URL 处理逻辑
     async fn check_openai_health(
         &self,
         api_key: &str,
         base_url: Option<&str>,
         model: &str,
     ) -> Result<(), String> {
-        let url = format!(
-            "{}/chat/completions",
-            base_url.unwrap_or("https://api.openai.com/v1")
-        );
+        // base_url 应该不带 /v1，在这里拼接
+        // 但为了兼容用户可能输入带 /v1 的情况，这里做智能处理
+        let base = base_url.unwrap_or("https://api.openai.com");
+        let base = base.trim_end_matches('/');
+
+        // 如果用户输入了带 /v1 的 URL，直接使用；否则拼接 /v1
+        let url = if base.ends_with("/v1") {
+            format!("{}/chat/completions", base)
+        } else {
+            format!("{}/v1/chat/completions", base)
+        };
 
         let request_body = serde_json::json!({
             "model": model,
             "messages": [{"role": "user", "content": "Say OK"}],
             "max_tokens": 10
         });
+
+        tracing::debug!("[HEALTH_CHECK] OpenAI API URL: {}, model: {}", url, model);
 
         let response = self
             .client
@@ -697,27 +709,44 @@ impl ProviderPoolService {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(format!("HTTP {}", response.status()))
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            Err(format!(
+                "HTTP {} - {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            ))
         }
     }
 
     // Claude API 健康检查
+    // 与 ClaudeCustomProvider 保持一致的 URL 处理逻辑
     async fn check_claude_health(
         &self,
         api_key: &str,
         base_url: Option<&str>,
         model: &str,
     ) -> Result<(), String> {
-        let url = format!(
-            "{}/messages",
-            base_url.unwrap_or("https://api.anthropic.com/v1")
-        );
+        // 与 ClaudeCustomProvider::get_base_url() 保持一致
+        // base_url 应该不带 /v1，在这里拼接
+        // 但为了兼容用户可能输入带 /v1 的情况，这里做智能处理
+        let base = base_url.unwrap_or("https://api.anthropic.com");
+        let base = base.trim_end_matches('/');
+
+        // 如果用户输入了带 /v1 的 URL，直接使用；否则拼接 /v1
+        let url = if base.ends_with("/v1") {
+            format!("{}/messages", base)
+        } else {
+            format!("{}/v1/messages", base)
+        };
 
         let request_body = serde_json::json!({
             "model": model,
             "messages": [{"role": "user", "content": "Say OK"}],
             "max_tokens": 10
         });
+
+        tracing::debug!("[HEALTH_CHECK] Claude API URL: {}, model: {}", url, model);
 
         let response = self
             .client
@@ -733,7 +762,13 @@ impl ProviderPoolService {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(format!("HTTP {}", response.status()))
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            Err(format!(
+                "HTTP {} - {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            ))
         }
     }
 

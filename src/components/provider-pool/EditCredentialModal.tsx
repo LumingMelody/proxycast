@@ -85,14 +85,24 @@ export function EditCredentialModal({
   // 初始化表单数据
   useEffect(() => {
     if (credential) {
+      console.log("[EditCredentialModal] 初始化表单数据:", {
+        uuid: credential.uuid,
+        name: credential.name,
+        check_model_name: credential.check_model_name,
+        not_supported_models: credential.not_supported_models,
+        base_url: credential.base_url,
+        api_key: credential.api_key ? "***" : undefined,
+      });
       setName(credential.name || "");
       setCheckHealth(credential.check_health);
       setCheckModelName(credential.check_model_name || "");
       setNotSupportedModels(credential.not_supported_models || []);
       setNewCredFilePath("");
       setNewProjectId("");
-      setNewBaseUrl("");
-      setNewApiKey("");
+      // 初始化 base_url 为已保存的值
+      setNewBaseUrl(credential.base_url || "");
+      // 初始化 api_key 为已保存的值
+      setNewApiKey(credential.api_key || "");
       setShowApiKey(false);
       setError(null);
     }
@@ -161,20 +171,22 @@ export function EditCredentialModal({
 
     try {
       const updateRequest: UpdateCredentialRequest = {
-        name: name.trim() || undefined,
+        // 始终传递 name，空字符串表示清除名称
+        name: name.trim(),
         check_health: checkHealth,
-        check_model_name: checkModelName.trim() || undefined,
+        // 始终传递 check_model_name，空字符串表示清除
+        check_model_name: checkModelName.trim(),
         // 始终传递 not_supported_models，即使为空数组（用于清除选择）
         not_supported_models: notSupportedModels,
         new_creds_file_path: newCredFilePath.trim() || undefined,
         new_project_id: newProjectId.trim() || undefined,
-        // API Key 的 base_url（空字符串表示清除，undefined 表示不修改）
-        new_base_url: isApiKey ? newBaseUrl : undefined,
-        // API Key 的 api_key（空字符串表示不修改）
-        new_api_key:
-          isApiKey && newApiKey.trim() ? newApiKey.trim() : undefined,
+        // API Key 的 base_url（始终传递当前值，空字符串表示使用默认 URL）
+        new_base_url: isApiKey ? newBaseUrl.trim() : undefined,
+        // API Key 的 api_key（始终传递当前值）
+        new_api_key: isApiKey ? newApiKey.trim() : undefined,
       };
 
+      console.log("[EditCredentialModal] 提交更新请求:", updateRequest);
       await onEdit(credential.uuid, updateRequest);
       onClose();
     } catch (e) {
@@ -352,13 +364,13 @@ export function EditCredentialModal({
                     onChange={(e) => setNewBaseUrl(e.target.value)}
                     placeholder={
                       credential.credential_type === "openai_key"
-                        ? "https://api.openai.com/v1"
-                        : "https://api.anthropic.com/v1"
+                        ? "https://api.openai.com"
+                        : "https://api.anthropic.com"
                     }
                     className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    留空使用默认 URL，或输入自定义代理地址
+                    留空使用默认 URL，或输入自定义代理地址（不要包含 /v1 后缀）
                   </p>
                 </div>
               </>

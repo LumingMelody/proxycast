@@ -267,6 +267,13 @@ pub fn update_provider_pool_credential(
     uuid: String,
     request: UpdateCredentialRequest,
 ) -> Result<ProviderCredential, String> {
+    tracing::info!(
+        "[UPDATE_CREDENTIAL] 收到更新请求: uuid={}, name={:?}, check_model_name={:?}, not_supported_models={:?}",
+        uuid,
+        request.name,
+        request.check_model_name,
+        request.not_supported_models
+    );
     // 如果需要重新上传文件，先处理文件上传
     let credential = if let Some(new_file_path) = request.new_creds_file_path {
         // 获取当前凭证以确定类型
@@ -339,8 +346,9 @@ pub fn update_provider_pool_credential(
         }
 
         // 应用其他更新
+        // 处理 name：空字符串表示清除，None 表示不修改
         if let Some(name) = request.name {
-            updated_cred.name = Some(name);
+            updated_cred.name = if name.is_empty() { None } else { Some(name) };
         }
         if let Some(is_disabled) = request.is_disabled {
             updated_cred.is_disabled = is_disabled;
@@ -348,8 +356,13 @@ pub fn update_provider_pool_credential(
         if let Some(check_health) = request.check_health {
             updated_cred.check_health = check_health;
         }
+        // 处理 check_model_name：空字符串表示清除，None 表示不修改
         if let Some(check_model_name) = request.check_model_name {
-            updated_cred.check_model_name = Some(check_model_name);
+            updated_cred.check_model_name = if check_model_name.is_empty() {
+                None
+            } else {
+                Some(check_model_name)
+            };
         }
         if let Some(not_supported_models) = request.not_supported_models {
             updated_cred.not_supported_models = not_supported_models;
@@ -404,8 +417,9 @@ pub fn update_provider_pool_credential(
         }
 
         // 应用其他更新
+        // 处理 name：空字符串表示清除，None 表示不修改
         if let Some(name) = request.name {
-            current_credential.name = Some(name);
+            current_credential.name = if name.is_empty() { None } else { Some(name) };
         }
         if let Some(is_disabled) = request.is_disabled {
             current_credential.is_disabled = is_disabled;
@@ -413,8 +427,13 @@ pub fn update_provider_pool_credential(
         if let Some(check_health) = request.check_health {
             current_credential.check_health = check_health;
         }
+        // 处理 check_model_name：空字符串表示清除，None 表示不修改
         if let Some(check_model_name) = request.check_model_name {
-            current_credential.check_model_name = Some(check_model_name);
+            current_credential.check_model_name = if check_model_name.is_empty() {
+                None
+            } else {
+                Some(check_model_name)
+            };
         }
         if let Some(not_supported_models) = request.not_supported_models {
             current_credential.not_supported_models = not_supported_models;

@@ -137,7 +137,7 @@ export const ProviderPoolPage = forwardRef<ProviderPoolPageRef>(
 
     // 切换到配置 tab 时加载配置
     useEffect(() => {
-      if (isConfigTab(activeTab) && !config) {
+      if (isConfigTab(activeTab)) {
         loadConfig();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -564,21 +564,30 @@ export const ProviderPoolPage = forwardRef<ProviderPoolPageRef>(
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {currentCredentials.map((credential) => (
-                  <CredentialCard
-                    key={credential.uuid}
-                    credential={credential}
-                    onToggle={() => handleToggle(credential)}
-                    onDelete={() => handleDeleteClick(credential.uuid)}
-                    onReset={() => handleReset(credential.uuid)}
-                    onCheckHealth={() => handleCheckHealth(credential.uuid)}
-                    onRefreshToken={() => handleRefreshToken(credential.uuid)}
-                    onEdit={() => handleEdit(credential)}
-                    deleting={deletingCredentials.has(credential.uuid)}
-                    checkingHealth={checkingHealth === credential.uuid}
-                    refreshingToken={refreshingToken === credential.uuid}
-                  />
-                ))}
+                {currentCredentials.map((credential) => {
+                  // 判断是否为 OAuth 类型（需要刷新 Token 功能）
+                  const isOAuthType =
+                    credential.credential_type.includes("oauth");
+                  return (
+                    <CredentialCard
+                      key={credential.uuid}
+                      credential={credential}
+                      onToggle={() => handleToggle(credential)}
+                      onDelete={() => handleDeleteClick(credential.uuid)}
+                      onReset={() => handleReset(credential.uuid)}
+                      onCheckHealth={() => handleCheckHealth(credential.uuid)}
+                      onRefreshToken={
+                        isOAuthType
+                          ? () => handleRefreshToken(credential.uuid)
+                          : undefined
+                      }
+                      onEdit={() => handleEdit(credential)}
+                      deleting={deletingCredentials.has(credential.uuid)}
+                      checkingHealth={checkingHealth === credential.uuid}
+                      refreshingToken={refreshingToken === credential.uuid}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
