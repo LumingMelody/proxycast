@@ -359,6 +359,30 @@ export const providerPoolApi = {
     return invoke("add_iflow_cookie_credential", { credsFilePath, name });
   },
 
+  // Antigravity OAuth 登录（打开浏览器授权）
+  async startAntigravityOAuthLogin(
+    name?: string,
+    skipProjectIdFetch?: boolean,
+  ): Promise<ProviderCredential> {
+    return invoke("start_antigravity_oauth_login", {
+      name,
+      skipProjectIdFetch,
+    });
+  },
+
+  // 获取 Antigravity OAuth 授权 URL 并等待回调（不自动打开浏览器）
+  // 服务器会在后台等待回调，成功后返回凭证
+  // 如果需要显示 URL，错误信息会包含 AUTH_URL: 前缀
+  async getAntigravityAuthUrlAndWait(
+    name?: string,
+    skipProjectIdFetch?: boolean,
+  ): Promise<ProviderCredential> {
+    return invoke("get_antigravity_auth_url_and_wait", {
+      name,
+      skipProjectIdFetch,
+    });
+  },
+
   // OAuth token management
   async refreshCredentialToken(uuid: string): Promise<string> {
     return invoke("refresh_pool_credential_token", { uuid });

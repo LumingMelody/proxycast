@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { X, Key, FolderOpen } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Key, FolderOpen, LogIn, Copy, Check, Loader2 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { providerPoolApi, PoolProviderType } from "@/lib/api/providerPool";
 
 interface AddCredentialModalProps {
@@ -14,7 +15,7 @@ const defaultCredsPath: Record<string, string> = {
   kiro: "~/.aws/sso/cache/kiro-auth-token.json",
   gemini: "~/.gemini/oauth_creds.json",
   qwen: "~/.qwen/oauth_creds.json",
-  antigravity: "~/.antigravity/oauth_creds.json",
+  antigravity: "",
   codex: "~/.codex/oauth.json",
   claude_oauth: "~/.claude/oauth.json",
   iflow: "~/.iflow/oauth_creds.json",
@@ -38,6 +39,11 @@ export function AddCredentialModal({
   // API Key fields
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+
+  // Antigravity 添加方式: "login" | "file"
+  const [antigravityMode, setAntigravityMode] = useState<"login" | "file">(
+    "login",
+  );
 
   const isOAuth = [
     "kiro",
@@ -75,7 +81,91 @@ export function AddCredentialModal({
     }
   };
 
+  // Antigravity OAuth 登录状态
+  const [antigravityAuthUrl, setAntigravityAuthUrl] = useState<string | null>(
+    null,
+  );
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [waitingForCallback, setWaitingForCallback] = useState(false);
+
+  // 监听后端发送的授权 URL 事件
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const setupListener = async () => {
+      unlisten = await listen<{ auth_url: string }>(
+        "antigravity-auth-url",
+        (event) => {
+          setAntigravityAuthUrl(event.payload.auth_url);
+        },
+      );
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
+
+  const handleAntigravityLogin = async () => {
+    setLoading(true);
+    setError(null);
+    setAntigravityAuthUrl(null);
+
+    try {
+      const trimmedName = name.trim() || undefined;
+      await providerPoolApi.startAntigravityOAuthLogin(trimmedName, false);
+      onSuccess();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 获取授权 URL 并启动服务器等待回调
+  const handleGetAntigravityAuthUrl = async () => {
+    setLoading(true);
+    setError(null);
+    setAntigravityAuthUrl(null);
+    setUrlCopied(false);
+    setWaitingForCallback(true);
+
+    try {
+      const trimmedName = name.trim() || undefined;
+      // 调用后端：启动服务器并等待回调
+      // 授权 URL 会通过事件发送
+      await providerPoolApi.getAntigravityAuthUrlAndWait(trimmedName, false);
+      // 如果成功返回，说明授权完成
+      onSuccess();
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setError(errorMsg);
+      setWaitingForCallback(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 复制授权 URL
+  const handleCopyAuthUrl = () => {
+    if (antigravityAuthUrl) {
+      navigator.clipboard.writeText(antigravityAuthUrl);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
+  };
+
   const handleSubmit = async () => {
+    // Antigravity 登录模式单独处理
+    if (providerType === "antigravity" && antigravityMode === "login") {
+      await handleAntigravityLogin();
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -151,6 +241,138 @@ export function AddCredentialModal({
     }
   };
 
+  // Antigravity 特殊渲染
+  const renderAntigravityContent = () => (
+    <>
+      {/* 模式选择 */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setAntigravityMode("login")}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+            antigravityMode === "login"
+              ? "border-primary bg-primary/10 text-primary"
+              : "hover:bg-muted"
+          }`}
+        >
+          <LogIn className="inline h-4 w-4 mr-1" />
+          Google 登录
+        </button>
+        <button
+          type="button"
+          onClick={() => setAntigravityMode("file")}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+            antigravityMode === "file"
+              ? "border-primary bg-primary/10 text-primary"
+              : "hover:bg-muted"
+          }`}
+        >
+          <FolderOpen className="inline h-4 w-4 mr-1" />
+          导入文件
+        </button>
+      </div>
+
+      {antigravityMode === "login" ? (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/30">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              点击下方按钮获取授权
+              URL，然后复制到浏览器（支持指纹浏览器）完成登录。
+            </p>
+            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              授权成功后，凭证将自动保存并添加到凭证池。
+            </p>
+          </div>
+
+          {/* 授权 URL 显示区域 */}
+          {antigravityAuthUrl && (
+            <div className="space-y-3">
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">授权 URL</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyAuthUrl}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-muted"
+                  >
+                    {urlCopied ? (
+                      <>
+                        <Check className="h-3 w-3 text-green-500" />
+                        <span className="text-green-500">已复制</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        <span>复制</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground break-all font-mono">
+                  {antigravityAuthUrl.slice(0, 100)}...
+                </p>
+              </div>
+
+              {waitingForCallback && (
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950/30">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      请复制上方 URL 到浏览器完成登录，正在等待授权回调...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 文件选择 */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              凭证文件路径 <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={credsFilePath}
+                onChange={(e) => setCredsFilePath(e.target.value)}
+                placeholder="选择 accounts.json 或 oauth_creds.json..."
+                className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleSelectFile}
+                className="flex items-center gap-1 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+              >
+                <FolderOpen className="h-4 w-4" />
+                浏览
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              支持 antigravity2api-nodejs 的 data/accounts.json 格式
+            </p>
+          </div>
+
+          {/* Project ID */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Project ID (可选)
+            </label>
+            <input
+              type="text"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              placeholder="Google Cloud Project ID..."
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+        </>
+      )}
+    </>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
@@ -180,7 +402,9 @@ export function AddCredentialModal({
             />
           </div>
 
-          {isOAuth ? (
+          {providerType === "antigravity" ? (
+            renderAntigravityContent()
+          ) : isOAuth ? (
             <>
               {/* Credential File */}
               <div>
@@ -211,8 +435,6 @@ export function AddCredentialModal({
                     "默认路径: ~/.gemini/oauth_creds.json"}
                   {providerType === "qwen" &&
                     "默认路径: ~/.qwen/oauth_creds.json"}
-                  {providerType === "antigravity" &&
-                    "默认路径: ~/.antigravity/oauth_creds.json"}
                   {providerType === "codex" && "默认路径: ~/.codex/oauth.json"}
                   {providerType === "claude_oauth" &&
                     "默认路径: ~/.claude/oauth.json"}
@@ -221,9 +443,8 @@ export function AddCredentialModal({
                 </p>
               </div>
 
-              {/* Gemini/Antigravity specific: Project ID */}
-              {(providerType === "gemini" ||
-                providerType === "antigravity") && (
+              {/* Gemini specific: Project ID */}
+              {providerType === "gemini" && (
                 <div>
                   <label className="mb-1 block text-sm font-medium">
                     Project ID (可选)
@@ -296,13 +517,26 @@ export function AddCredentialModal({
           >
             取消
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {loading ? "添加中..." : "添加凭证"}
-          </button>
+          {providerType === "antigravity" && antigravityMode === "login" ? (
+            // Antigravity 登录模式：显示获取授权 URL 按钮
+            !antigravityAuthUrl && (
+              <button
+                onClick={handleGetAntigravityAuthUrl}
+                disabled={loading}
+                className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {loading ? "获取中..." : "获取授权 URL"}
+              </button>
+            )
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {loading ? "添加中..." : "添加凭证"}
+            </button>
+          )}
         </div>
       </div>
     </div>

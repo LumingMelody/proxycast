@@ -334,6 +334,7 @@ impl ProviderCredential {
     /// 检查两个来源的排除列表：
     /// 1. `not_supported_models` - 通用的不支持模型列表（精确匹配）
     /// 2. `excluded_models` - 来自 CredentialData::GeminiApiKey 的排除列表（支持通配符）
+    /// 3. Antigravity 凭证只支持特定的模型列表
     pub fn supports_model(&self, model: &str) -> bool {
         // 检查通用的不支持模型列表（精确匹配）
         if self.not_supported_models.contains(&model.to_string()) {
@@ -350,6 +351,19 @@ impl ProviderCredential {
                     return false;
                 }
             }
+        }
+
+        // Antigravity 凭证只支持特定的模型
+        if let CredentialData::AntigravityOAuth { .. } = &self.credential {
+            // Antigravity 支持的模型列表
+            const ANTIGRAVITY_SUPPORTED_MODELS: &[&str] = &[
+                "gemini-3-pro-preview",
+                "gemini-3-pro-image-preview",
+                "gemini-2.5-computer-use-preview-10-2025",
+                "gemini-claude-sonnet-4-5",
+                "gemini-claude-sonnet-4-5-thinking",
+            ];
+            return ANTIGRAVITY_SUPPORTED_MODELS.contains(&model);
         }
 
         true

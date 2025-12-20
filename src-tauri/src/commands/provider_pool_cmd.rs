@@ -12,7 +12,7 @@ use chrono::Utc;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Emitter, State};
 use uuid::Uuid;
 
 pub struct ProviderPoolServiceState(pub Arc<ProviderPoolService>);
@@ -1131,4 +1131,121 @@ pub struct MigrationResultResponse {
     pub skipped_count: usize,
     /// 错误信息列表
     pub errors: Vec<String>,
+}
+
+/// 获取 Antigravity OAuth 授权 URL 并等待回调（不自动打开浏览器）
+///
+/// 启动服务器后通过事件发送授权 URL，然后等待回调
+/// 成功后返回凭证
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AntigravityAuthUrlResponse {
+    pub auth_url: String,
+}
+
+#[tauri::command]
+pub async fn get_antigravity_auth_url_and_wait(
+    app: tauri::AppHandle,
+    db: State<'_, DbConnection>,
+    pool_service: State<'_, ProviderPoolServiceState>,
+    name: Option<String>,
+    skip_project_id_fetch: Option<bool>,
+) -> Result<ProviderCredential, String> {
+    use crate::providers::antigravity;
+
+    tracing::info!("[Antigravity OAuth] 启动服务器并获取授权 URL");
+
+    // 启动服务器并获取授权 URL
+    let (auth_url, wait_future) =
+        antigravity::start_oauth_server_and_get_url(skip_project_id_fetch.unwrap_or(false))
+            .await
+            .map_err(|e| format!("启动 OAuth 服务器失败: {}", e))?;
+
+    tracing::info!("[Antigravity OAuth] 授权 URL: {}", auth_url);
+
+    // 通过事件发送授权 URL 给前端
+    let _ = app.emit(
+        "antigravity-auth-url",
+        AntigravityAuthUrlResponse {
+            auth_url: auth_url.clone(),
+        },
+    );
+
+    // 等待回调
+    let result = wait_future.await.map_err(|e| e.to_string())?;
+
+    tracing::info!(
+        "[Antigravity OAuth] 登录成功，凭证保存到: {}",
+        result.creds_file_path
+    );
+
+    // 从凭证中获取 project_id
+    let project_id = result.credentials.projectId.clone();
+
+    // 添加到凭证池
+    let credential = pool_service.0.add_credential(
+        &db,
+        "antigravity",
+        CredentialData::AntigravityOAuth {
+            creds_file_path: result.creds_file_path,
+            project_id,
+        },
+        name,
+        Some(true),
+        None,
+    )?;
+
+    tracing::info!(
+        "[Antigravity OAuth] 凭证已添加到凭证池: {}",
+        credential.uuid
+    );
+
+    Ok(credential)
+}
+
+/// 启动 Antigravity OAuth 登录流程
+///
+/// 打开浏览器让用户登录 Google 账号，获取 Antigravity 凭证
+#[tauri::command]
+pub async fn start_antigravity_oauth_login(
+    db: State<'_, DbConnection>,
+    pool_service: State<'_, ProviderPoolServiceState>,
+    name: Option<String>,
+    skip_project_id_fetch: Option<bool>,
+) -> Result<ProviderCredential, String> {
+    use crate::providers::antigravity;
+
+    tracing::info!("[Antigravity OAuth] 开始 OAuth 登录流程");
+
+    // 启动 OAuth 登录
+    let result = antigravity::start_oauth_login(skip_project_id_fetch.unwrap_or(false))
+        .await
+        .map_err(|e| format!("Antigravity OAuth 登录失败: {}", e))?;
+
+    tracing::info!(
+        "[Antigravity OAuth] 登录成功，凭证保存到: {}",
+        result.creds_file_path
+    );
+
+    // 从凭证中获取 project_id
+    let project_id = result.credentials.projectId.clone();
+
+    // 添加到凭证池
+    let credential = pool_service.0.add_credential(
+        &db,
+        "antigravity",
+        CredentialData::AntigravityOAuth {
+            creds_file_path: result.creds_file_path,
+            project_id,
+        },
+        name,
+        Some(true),
+        None,
+    )?;
+
+    tracing::info!(
+        "[Antigravity OAuth] 凭证已添加到凭证池: {}",
+        credential.uuid
+    );
+
+    Ok(credential)
 }

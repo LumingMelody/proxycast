@@ -239,6 +239,45 @@ export function ApiServerPage() {
     : "http://localhost:3001";
   const apiKey = config?.server.api_key || "proxycast-key";
 
+  // 根据 Provider 类型获取测试模型
+  const getTestModel = (provider: string): string => {
+    switch (provider) {
+      case "antigravity":
+        return "gemini-3-pro-preview";
+      case "gemini":
+        return "gemini-2.0-flash";
+      case "qwen":
+        return "qwen-max";
+      case "openai":
+        return "gpt-4o";
+      case "claude":
+        return "claude-sonnet-4-20250514";
+      case "kiro":
+      default:
+        return "claude-opus-4-5-20251101";
+    }
+  };
+
+  const testModel = getTestModel(defaultProvider);
+
+  // 根据 Provider 类型获取 Gemini 测试模型
+  const getGeminiTestModel = (provider: string): string => {
+    switch (provider) {
+      case "antigravity":
+        return "gemini-3-pro-preview";
+      case "gemini":
+        return "gemini-2.0-flash";
+      default:
+        return "gemini-2.0-flash";
+    }
+  };
+
+  const geminiTestModel = getGeminiTestModel(defaultProvider);
+
+  // 是否显示 Gemini 测试端点
+  const showGeminiTest =
+    defaultProvider === "antigravity" || defaultProvider === "gemini";
+
   // Test endpoints
   const testEndpoints = [
     {
@@ -264,7 +303,7 @@ export function ApiServerPage() {
       path: "/v1/chat/completions",
       needsAuth: true,
       body: JSON.stringify({
-        model: "claude-opus-4-5-20251101",
+        model: testModel,
         messages: [{ role: "user", content: "Say hi in one word" }],
       }),
     },
@@ -275,7 +314,7 @@ export function ApiServerPage() {
       path: "/v1/messages",
       needsAuth: true,
       body: JSON.stringify({
-        model: "claude-opus-4-5-20251101",
+        model: testModel,
         max_tokens: 100,
         messages: [
           {
@@ -285,6 +324,31 @@ export function ApiServerPage() {
         ],
       }),
     },
+    // Gemini 原生协议测试（仅在 Antigravity 或 Gemini Provider 时显示）
+    ...(showGeminiTest
+      ? [
+          {
+            id: "gemini",
+            name: "Gemini Generate",
+            method: "POST",
+            path: `/v1/gemini/${geminiTestModel}:generateContent`,
+            needsAuth: true,
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    { text: "What is 2+2? Answer with just the number." },
+                  ],
+                },
+              ],
+              generationConfig: {
+                maxOutputTokens: 100,
+              },
+            }),
+          },
+        ]
+      : []),
   ];
 
   const runTest = async (endpoint: (typeof testEndpoints)[0]) => {

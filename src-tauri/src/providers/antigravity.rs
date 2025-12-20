@@ -6,6 +6,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
 // Constants
@@ -16,9 +18,18 @@ const CREDENTIALS_DIR: &str = ".antigravity";
 const CREDENTIALS_FILE: &str = "oauth_creds.json";
 
 // OAuth credentials - 与 Antigravity CLI 相同
-const OAUTH_CLIENT_ID: &str =
+pub const OAUTH_CLIENT_ID: &str =
     "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
-const OAUTH_CLIENT_SECRET: &str = "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";
+pub const OAUTH_CLIENT_SECRET: &str = "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";
+
+// OAuth scopes
+const OAUTH_SCOPES: &[&str] = &[
+    "https://www.googleapis.com/auth/cloud-platform",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/cclog",
+    "https://www.googleapis.com/auth/experimentsandconfigs",
+];
 
 // Token 刷新提前量（秒）
 const REFRESH_SKEW: i64 = 3000;
@@ -93,8 +104,7 @@ pub struct AntigravityCredentials {
     /// 过期时间戳（毫秒）- 兼容旧格式
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_date: Option<i64>,
-    /// 过期时间（RFC3339 格式）- 与 CLIProxyAPI 兼容
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// 过期时间（RFC3339 格式）-
     pub expire: Option<String>,
     pub scope: Option<String>,
     /// 最后刷新时间（RFC3339 格式）
@@ -103,6 +113,21 @@ pub struct AntigravityCredentials {
     /// 凭证类型标识
     #[serde(default = "default_antigravity_type", rename = "type")]
     pub cred_type: String,
+    /// Token 有效期（秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<i64>,
+    /// Token 获取时间戳（毫秒）-
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
+    /// 是否启用 -
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<bool>,
+    /// 项目 ID
+    #[serde(skip_serializing_if = "Option::is_none", alias = "project_id")]
+    pub projectId: Option<String>,
+    /// 用户邮箱
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 fn default_antigravity_type() -> String {
@@ -120,6 +145,11 @@ impl Default for AntigravityCredentials {
             scope: None,
             last_refresh: None,
             cred_type: default_antigravity_type(),
+            expires_in: None,
+            timestamp: None,
+            enable: None,
+            projectId: None,
+            email: None,
         }
     }
 }
@@ -180,9 +210,32 @@ impl AntigravityProvider {
         path: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let content = tokio::fs::read_to_string(path).await?;
-        let creds: AntigravityCredentials = serde_json::from_str(&content)?;
-        self.credentials = creds;
-        Ok(())
+
+        // 尝试解析为单个凭证对象
+        if let Ok(creds) = serde_json::from_str::<AntigravityCredentials>(&content) {
+            self.credentials = creds;
+            // 如果凭证中有 projectId，设置到 provider
+            if let Some(ref pid) = self.credentials.projectId {
+                self.project_id = Some(pid.clone());
+            }
+            return Ok(());
+        }
+
+        // 尝试解析为数组格式（兼容 antigravity2api-nodejs 的 accounts.json）
+        if let Ok(creds_array) = serde_json::from_str::<Vec<AntigravityCredentials>>(&content) {
+            // 找到第一个启用的凭证
+            if let Some(creds) = creds_array.into_iter().find(|c| c.enable != Some(false)) {
+                self.credentials = creds;
+                // 如果凭证中有 projectId，设置到 provider
+                if let Some(ref pid) = self.credentials.projectId {
+                    self.project_id = Some(pid.clone());
+                }
+                return Ok(());
+            }
+            return Err("凭证文件中没有可用的账号（所有账号都被禁用）".into());
+        }
+
+        Err("无法解析凭证文件，请确保是有效的 JSON 格式".into())
     }
 
     pub async fn save_credentials(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -197,6 +250,11 @@ impl AntigravityProvider {
 
     pub fn is_token_valid(&self) -> bool {
         if self.credentials.access_token.is_none() {
+            return false;
+        }
+
+        // 检查是否被禁用
+        if self.credentials.enable == Some(false) {
             return false;
         }
 
@@ -215,6 +273,17 @@ impl AntigravityProvider {
             // Token valid if more than 5 minutes until expiry
             return expiry > now + 300_000;
         }
+
+        // 兼容 antigravity2api-nodejs 格式：timestamp + expires_in
+        if let (Some(timestamp), Some(expires_in)) =
+            (self.credentials.timestamp, self.credentials.expires_in)
+        {
+            let expiry = timestamp + (expires_in * 1000);
+            let now = chrono::Utc::now().timestamp_millis();
+            // Token valid if more than 5 minutes until expiry
+            return expiry > now + 300_000;
+        }
+
         true
     }
 
@@ -234,6 +303,17 @@ impl AntigravityProvider {
             let refresh_skew_ms = REFRESH_SKEW * 1000;
             return expiry <= now + refresh_skew_ms;
         }
+
+        // 兼容 antigravity2api-nodejs 格式：timestamp + expires_in
+        if let (Some(timestamp), Some(expires_in)) =
+            (self.credentials.timestamp, self.credentials.expires_in)
+        {
+            let expiry = timestamp + (expires_in * 1000);
+            let now = chrono::Utc::now().timestamp_millis();
+            let refresh_skew_ms = REFRESH_SKEW * 1000;
+            return expiry <= now + refresh_skew_ms;
+        }
+
         true
     }
 
@@ -272,11 +352,18 @@ impl AntigravityProvider {
 
         self.credentials.access_token = Some(new_token.to_string());
 
-        // 更新过期时间（同时保存两种格式以兼容）
+        // 更新过期时间（同时保存多种格式以兼容）
         if let Some(expires_in) = data["expires_in"].as_i64() {
-            let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
+            let now = chrono::Utc::now();
+            let expires_at = now + chrono::Duration::seconds(expires_in);
+
+            // RFC3339 格式
             self.credentials.expire = Some(expires_at.to_rfc3339());
+            // 毫秒时间戳格式
             self.credentials.expiry_date = Some(expires_at.timestamp_millis());
+            // antigravity2api-nodejs 格式
+            self.credentials.expires_in = Some(expires_in);
+            self.credentials.timestamp = Some(now.timestamp_millis());
         }
 
         // 如果返回了新的 refresh_token，也更新它
@@ -518,5 +605,919 @@ impl AntigravityProvider {
     /// 检查模型是否支持
     pub fn supports_model(&self, model: &str) -> bool {
         self.available_models.iter().any(|m| m == model)
+    }
+}
+
+// ============================================================================
+// OAuth 登录功能
+// ============================================================================
+
+/// OAuth 回调结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthCallbackResult {
+    pub code: String,
+    pub state: String,
+}
+
+/// OAuth 登录成功后的凭证信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AntigravityOAuthResult {
+    pub credentials: AntigravityCredentials,
+    pub creds_file_path: String,
+}
+
+/// 生成 OAuth 授权 URL
+pub fn generate_auth_url(port: u16, state: &str) -> String {
+    let scopes = OAUTH_SCOPES.join(" ");
+    let redirect_uri = format!("http://localhost:{}/oauth-callback", port);
+
+    let params = [
+        ("access_type", "offline"),
+        ("client_id", OAUTH_CLIENT_ID),
+        ("prompt", "consent"),
+        ("redirect_uri", &redirect_uri),
+        ("response_type", "code"),
+        ("scope", &scopes),
+        ("state", state),
+    ];
+
+    let query = params
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .collect::<Vec<_>>()
+        .join("&");
+
+    format!("https://accounts.google.com/o/oauth2/v2/auth?{}", query)
+}
+
+/// 用授权码交换 Token
+pub async fn exchange_code_for_token(
+    client: &Client,
+    code: &str,
+    redirect_uri: &str,
+) -> Result<serde_json::Value, Box<dyn Error + Send + Sync>> {
+    let params = [
+        ("code", code),
+        ("client_id", OAUTH_CLIENT_ID),
+        ("client_secret", OAUTH_CLIENT_SECRET),
+        ("redirect_uri", redirect_uri),
+        ("grant_type", "authorization_code"),
+    ];
+
+    let resp = client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&params)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("Token 交换失败: {} - {}", status, body).into());
+    }
+
+    let data: serde_json::Value = resp.json().await?;
+    Ok(data)
+}
+
+/// 获取用户邮箱
+pub async fn fetch_user_email(
+    client: &Client,
+    access_token: &str,
+) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
+    let resp = client
+        .get("https://www.googleapis.com/oauth2/v2/userinfo")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await?;
+
+    if resp.status().is_success() {
+        let data: serde_json::Value = resp.json().await?;
+        Ok(data["email"].as_str().map(|s| s.to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+/// 获取项目 ID（验证账号资格）
+/// 返回值说明：
+/// - Ok(Some(FetchedProjectId::HasProject(id))) - 有资格，且有 projectId
+/// - Ok(Some(FetchedProjectId::NoProject)) - 有资格，但 projectId 为空（需要生成随机 ID）
+/// - Ok(None) - 无资格（字段不存在，即 undefined）
+/// - Err(_) - 请求失败
+#[derive(Debug, Clone)]
+pub enum FetchedProjectId {
+    /// 有 projectId
+    HasProject(String),
+    /// projectId 为空字符串（有资格但无 projectId）
+    NoProject,
+}
+
+pub async fn fetch_project_id_for_oauth(
+    client: &Client,
+    access_token: &str,
+) -> Result<Option<FetchedProjectId>, Box<dyn Error + Send + Sync>> {
+    tracing::info!("[Antigravity OAuth] 正在获取 projectId...");
+
+    let resp = client
+        .post("https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("User-Agent", "antigravity/1.11.9 windows/amd64")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "metadata": { "ideType": "ANTIGRAVITY" } }))
+        .send()
+        .await?;
+
+    let status = resp.status();
+    tracing::info!("[Antigravity OAuth] loadCodeAssist 响应状态: {}", status);
+
+    if status.is_success() {
+        let body_text = resp.text().await?;
+        tracing::info!("[Antigravity OAuth] loadCodeAssist 响应体: {}", body_text);
+
+        let data: serde_json::Value = serde_json::from_str(&body_text)?;
+        // 检查字段是否存在
+        // - 如果字段不存在（undefined）-> None（无资格）
+        // - 如果字段存在但为空字符串 -> Some(NoProject)（有资格但无 projectId）
+        // - 如果字段存在且有值 -> Some(HasProject(id))（有资格且有 projectId）
+        match data.get("cloudaicompanionProject") {
+            None => {
+                tracing::warn!("[Antigravity OAuth] cloudaicompanionProject 字段不存在");
+                Ok(None) // 字段不存在，无资格
+            }
+            Some(value) => {
+                if value.is_null() {
+                    tracing::warn!("[Antigravity OAuth] cloudaicompanionProject 为 null");
+                    Ok(None) // null 也视为无资格
+                } else if let Some(s) = value.as_str() {
+                    if s.is_empty() {
+                        tracing::info!("[Antigravity OAuth] cloudaicompanionProject 为空字符串，有资格但无 projectId");
+                        Ok(Some(FetchedProjectId::NoProject)) // 空字符串，有资格但无 projectId
+                    } else {
+                        tracing::info!("[Antigravity OAuth] 获取到 projectId: {}", s);
+                        Ok(Some(FetchedProjectId::HasProject(s.to_string()))) // 有 projectId
+                    }
+                } else {
+                    tracing::warn!(
+                        "[Antigravity OAuth] cloudaicompanionProject 不是字符串类型: {:?}",
+                        value
+                    );
+                    Ok(None) // 非字符串类型，视为无资格
+                }
+            }
+        }
+    } else {
+        let body = resp.text().await.unwrap_or_default();
+        tracing::error!(
+            "[Antigravity OAuth] loadCodeAssist 请求失败: {} - {}",
+            status,
+            body
+        );
+        Err(format!("loadCodeAssist 请求失败: {} - {}", status, body).into())
+    }
+}
+
+/// OAuth 成功页面 HTML
+const OAUTH_SUCCESS_HTML: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>授权成功</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { text-align: center; background: white; padding: 40px 60px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        h1 { color: #22c55e; margin-bottom: 16px; }
+        p { color: #666; margin-bottom: 8px; }
+        .email { color: #333; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✓ 授权成功</h1>
+        <p>账号已添加到 ProxyCast</p>
+        <p class="email">EMAIL_PLACEHOLDER</p>
+        <p style="margin-top: 20px; color: #999;">可以关闭此页面</p>
+    </div>
+</body>
+</html>"#;
+
+/// OAuth 失败页面 HTML
+const OAUTH_ERROR_HTML: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>授权失败</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { text-align: center; background: white; padding: 40px 60px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        h1 { color: #ef4444; margin-bottom: 16px; }
+        p { color: #666; }
+        .error { color: #ef4444; font-size: 14px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✗ 授权失败</h1>
+        <p>ERROR_PLACEHOLDER</p>
+        <p style="margin-top: 20px; color: #999;">请关闭此页面后重试</p>
+    </div>
+</body>
+</html>"#;
+
+/// OAuth 授权 URL 结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthAuthUrlResult {
+    pub auth_url: String,
+    pub port: u16,
+    pub state: String,
+}
+
+/// 启动 OAuth 服务器并返回授权 URL（不打开浏览器）
+/// 服务器会在后台等待回调，成功后返回凭证
+pub async fn start_oauth_server_and_get_url(
+    skip_project_id_fetch: bool,
+) -> Result<
+    (
+        String,
+        impl std::future::Future<Output = Result<AntigravityOAuthResult, Box<dyn Error + Send + Sync>>>,
+    ),
+    Box<dyn Error + Send + Sync>,
+> {
+    use axum::{extract::Query, response::Html, routing::get, Router};
+    use std::collections::HashMap;
+    use tokio::net::TcpListener;
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    // 生成随机 state
+    let state = Uuid::new_v4().to_string();
+    let state_clone = state.clone();
+
+    // 创建 channel 用于接收回调结果
+    let (tx, rx) = oneshot::channel::<Result<AntigravityOAuthResult, String>>();
+    let tx = Arc::new(tokio::sync::Mutex::new(Some(tx)));
+
+    // 绑定到随机端口
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let port = listener.local_addr()?.port();
+
+    let redirect_uri = format!("http://localhost:{}/oauth-callback", port);
+    let redirect_uri_clone = redirect_uri.clone();
+
+    // 生成授权 URL
+    let auth_url = generate_auth_url(port, &state);
+
+    tracing::info!(
+        "[Antigravity OAuth] 服务器启动在端口 {}, 授权 URL: {}",
+        port,
+        auth_url
+    );
+
+    // 构建路由
+    let app = Router::new().route(
+        "/oauth-callback",
+        get(move |Query(params): Query<HashMap<String, String>>| {
+            let tx = tx.clone();
+            let client = client.clone();
+            let state_expected = state_clone.clone();
+            let redirect_uri = redirect_uri_clone.clone();
+
+            async move {
+                let code = params.get("code");
+                let returned_state = params.get("state");
+                let error = params.get("error");
+
+                // 检查错误
+                if let Some(err) = error {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", err);
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(format!("OAuth 错误: {}", err)));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 state
+                if returned_state.map(|s| s.as_str()) != Some(&state_expected) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "State 验证失败");
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err("State 验证失败".to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 code
+                let code = match code {
+                    Some(c) => c,
+                    None => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "未收到授权码");
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err("未收到授权码".to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                // 交换 Token
+                let token_result = exchange_code_for_token(&client, code, &redirect_uri).await;
+                let token_data = match token_result {
+                    Ok(data) => data,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &e.to_string());
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                let access_token = token_data["access_token"].as_str().unwrap_or_default();
+                let refresh_token = token_data["refresh_token"].as_str().map(|s| s.to_string());
+                let expires_in = token_data["expires_in"].as_i64();
+
+                // 获取用户邮箱
+                let email = fetch_user_email(&client, access_token).await.ok().flatten();
+
+                // 获取项目 ID
+                let project_id = if skip_project_id_fetch {
+                    tracing::info!("[Antigravity OAuth] 跳过 projectId 获取，使用随机生成的 ID");
+                    Some(generate_project_id())
+                } else {
+                    match fetch_project_id_for_oauth(&client, access_token).await {
+                        Ok(Some(FetchedProjectId::HasProject(pid))) => Some(pid),
+                        Ok(Some(FetchedProjectId::NoProject)) => {
+                            tracing::info!("[Antigravity OAuth] projectId 为空，使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Ok(None) => {
+                            tracing::warn!("[Antigravity OAuth] 无法获取 projectId（字段不存在），使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Err(e) => {
+                            tracing::warn!("[Antigravity OAuth] 获取 projectId 失败: {}, 使用随机 ID", e);
+                            Some(generate_project_id())
+                        }
+                    }
+                };
+
+                // 构建凭证
+                let now = chrono::Utc::now();
+                let credentials = AntigravityCredentials {
+                    access_token: Some(access_token.to_string()),
+                    refresh_token,
+                    token_type: Some("Bearer".to_string()),
+                    expiry_date: expires_in.map(|e| (now + chrono::Duration::seconds(e)).timestamp_millis()),
+                    expire: expires_in.map(|e| (now + chrono::Duration::seconds(e)).to_rfc3339()),
+                    scope: Some(OAUTH_SCOPES.join(" ")),
+                    last_refresh: Some(now.to_rfc3339()),
+                    cred_type: "antigravity".to_string(),
+                    expires_in,
+                    timestamp: Some(now.timestamp_millis()),
+                    enable: Some(true),
+                    projectId: project_id,
+                    email: email.clone(),
+                };
+
+                // 保存凭证到应用数据目录
+                let creds_dir = dirs::data_dir()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join("proxycast")
+                    .join("credentials")
+                    .join("antigravity");
+
+                if let Err(e) = std::fs::create_dir_all(&creds_dir) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("创建目录失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 使用 UUID 作为文件名
+                let file_name = format!("{}.json", Uuid::new_v4());
+                let creds_path = creds_dir.join(&file_name);
+
+                let creds_json = match serde_json::to_string_pretty(&credentials) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("序列化失败: {}", e));
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                if let Err(e) = std::fs::write(&creds_path, &creds_json) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("保存凭证失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                let creds_path_str = creds_path.to_string_lossy().to_string();
+                tracing::info!("[Antigravity OAuth] 凭证已保存到: {}", creds_path_str);
+
+                // 发送成功结果
+                let result = AntigravityOAuthResult {
+                    credentials,
+                    creds_file_path: creds_path_str,
+                };
+
+                if let Some(sender) = tx.lock().await.take() {
+                    let _ = sender.send(Ok(result));
+                }
+
+                let email_display = email.unwrap_or_else(|| "未知邮箱".to_string());
+                let html = OAUTH_SUCCESS_HTML.replace("EMAIL_PLACEHOLDER", &email_display);
+                Html(html)
+            }
+        }),
+    );
+
+    // 创建等待回调的 Future
+    let wait_future = async move {
+        // 启动服务器
+        let server = axum::serve(listener, app);
+
+        // 同时运行服务器和等待回调结果
+        tokio::select! {
+            result = async {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(300),
+                    rx
+                ).await
+            } => {
+                match result {
+                    Ok(Ok(Ok(r))) => Ok(r),
+                    Ok(Ok(Err(e))) => Err(e.into()),
+                    Ok(Err(_)) => Err("OAuth 回调通道关闭".into()),
+                    Err(_) => Err("OAuth 登录超时（5分钟）".into()),
+                }
+            }
+            server_result = server => {
+                match server_result {
+                    Ok(_) => Err("服务器意外关闭".into()),
+                    Err(e) => Err(format!("服务器错误: {}", e).into()),
+                }
+            }
+        }
+    };
+
+    Ok((auth_url, wait_future))
+}
+
+/// 启动 OAuth 登录流程（使用指定端口）
+/// 用于配合 get_oauth_auth_url 使用
+pub async fn start_oauth_login_with_port(
+    port: u16,
+    state: String,
+    skip_project_id_fetch: bool,
+) -> Result<AntigravityOAuthResult, Box<dyn Error + Send + Sync>> {
+    use axum::{extract::Query, response::Html, routing::get, Router};
+    use std::collections::HashMap;
+    use tokio::net::TcpListener;
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    let state_clone = state.clone();
+
+    // 创建 channel 用于接收回调结果
+    let (tx, rx) = oneshot::channel::<Result<AntigravityOAuthResult, String>>();
+    let tx = Arc::new(tokio::sync::Mutex::new(Some(tx)));
+
+    // 绑定到指定端口
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
+
+    let redirect_uri = format!("http://localhost:{}/oauth-callback", port);
+    let redirect_uri_clone = redirect_uri.clone();
+
+    // 构建路由
+    let app = Router::new().route(
+        "/oauth-callback",
+        get(move |Query(params): Query<HashMap<String, String>>| {
+            let tx = tx.clone();
+            let client = client.clone();
+            let state_expected = state_clone.clone();
+            let redirect_uri = redirect_uri_clone.clone();
+
+            async move {
+                let code = params.get("code");
+                let returned_state = params.get("state");
+                let error = params.get("error");
+
+                // 检查错误
+                if let Some(err) = error {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", err);
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(format!("OAuth 错误: {}", err)));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 state
+                if returned_state.map(|s| s.as_str()) != Some(&state_expected) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "State 验证失败");
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err("State 验证失败".to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 code
+                let code = match code {
+                    Some(c) => c,
+                    None => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "未收到授权码");
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err("未收到授权码".to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                // 交换 Token
+                let token_result = exchange_code_for_token(&client, code, &redirect_uri).await;
+                let token_data = match token_result {
+                    Ok(data) => data,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &e.to_string());
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                let access_token = token_data["access_token"].as_str().unwrap_or_default();
+                let refresh_token = token_data["refresh_token"].as_str().map(|s| s.to_string());
+                let expires_in = token_data["expires_in"].as_i64();
+
+                // 获取用户邮箱
+                let email = fetch_user_email(&client, access_token).await.ok().flatten();
+
+                // 获取项目 ID
+                let project_id = if skip_project_id_fetch {
+                    tracing::info!("[Antigravity OAuth] 跳过 projectId 获取，使用随机生成的 ID");
+                    Some(generate_project_id())
+                } else {
+                    match fetch_project_id_for_oauth(&client, access_token).await {
+                        Ok(Some(FetchedProjectId::HasProject(pid))) => Some(pid),
+                        Ok(Some(FetchedProjectId::NoProject)) => {
+                            tracing::info!("[Antigravity OAuth] projectId 为空，使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Ok(None) => {
+                            tracing::warn!("[Antigravity OAuth] 无法获取 projectId（字段不存在），使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Err(e) => {
+                            tracing::warn!("[Antigravity OAuth] 获取 projectId 失败: {}, 使用随机 ID", e);
+                            Some(generate_project_id())
+                        }
+                    }
+                };
+
+                // 构建凭证
+                let now = chrono::Utc::now();
+                let credentials = AntigravityCredentials {
+                    access_token: Some(access_token.to_string()),
+                    refresh_token,
+                    token_type: Some("Bearer".to_string()),
+                    expiry_date: expires_in.map(|e| (now + chrono::Duration::seconds(e)).timestamp_millis()),
+                    expire: expires_in.map(|e| (now + chrono::Duration::seconds(e)).to_rfc3339()),
+                    scope: Some(OAUTH_SCOPES.join(" ")),
+                    last_refresh: Some(now.to_rfc3339()),
+                    cred_type: "antigravity".to_string(),
+                    expires_in,
+                    timestamp: Some(now.timestamp_millis()),
+                    enable: Some(true),
+                    projectId: project_id,
+                    email: email.clone(),
+                };
+
+                // 保存凭证到应用数据目录
+                let creds_dir = dirs::data_dir()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join("proxycast")
+                    .join("credentials")
+                    .join("antigravity");
+
+                if let Err(e) = std::fs::create_dir_all(&creds_dir) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("创建目录失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 使用 UUID 作为文件名
+                let file_name = format!("{}.json", Uuid::new_v4());
+                let creds_path = creds_dir.join(&file_name);
+
+                let creds_json = match serde_json::to_string_pretty(&credentials) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("序列化失败: {}", e));
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                if let Err(e) = std::fs::write(&creds_path, &creds_json) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("保存凭证失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                let creds_path_str = creds_path.to_string_lossy().to_string();
+                tracing::info!("[Antigravity OAuth] 凭证已保存到: {}", creds_path_str);
+
+                // 发送成功结果
+                let result = AntigravityOAuthResult {
+                    credentials,
+                    creds_file_path: creds_path_str,
+                };
+
+                if let Some(sender) = tx.lock().await.take() {
+                    let _ = sender.send(Ok(result));
+                }
+
+                let email_display = email.unwrap_or_else(|| "未知邮箱".to_string());
+                let html = OAUTH_SUCCESS_HTML.replace("EMAIL_PLACEHOLDER", &email_display);
+                Html(html)
+            }
+        }),
+    );
+
+    // 启动服务器
+    let server = axum::serve(listener, app);
+
+    // 同时运行服务器和等待回调结果
+    tokio::select! {
+        result = async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(300),
+                rx
+            ).await
+        } => {
+            match result {
+                Ok(Ok(Ok(r))) => Ok(r),
+                Ok(Ok(Err(e))) => Err(e.into()),
+                Ok(Err(_)) => Err("OAuth 回调通道关闭".into()),
+                Err(_) => Err("OAuth 登录超时（5分钟）".into()),
+            }
+        }
+        server_result = server => {
+            match server_result {
+                Ok(_) => Err("服务器意外关闭".into()),
+                Err(e) => Err(format!("服务器错误: {}", e).into()),
+            }
+        }
+    }
+}
+
+/// 启动 OAuth 登录流程
+/// 返回 (auth_url, credentials_file_path)
+pub async fn start_oauth_login(
+    skip_project_id_fetch: bool,
+) -> Result<AntigravityOAuthResult, Box<dyn Error + Send + Sync>> {
+    use axum::{extract::Query, response::Html, routing::get, Router};
+    use std::collections::HashMap;
+    use tokio::net::TcpListener;
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    // 生成随机 state
+    let state = Uuid::new_v4().to_string();
+    let state_clone = state.clone();
+
+    // 创建 channel 用于接收回调结果
+    let (tx, rx) = oneshot::channel::<Result<AntigravityOAuthResult, String>>();
+    let tx = Arc::new(tokio::sync::Mutex::new(Some(tx)));
+
+    // 绑定到随机端口
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let port = listener.local_addr()?.port();
+
+    let redirect_uri = format!("http://localhost:{}/oauth-callback", port);
+    let redirect_uri_clone = redirect_uri.clone();
+
+    // 构建路由
+    let app = Router::new().route(
+        "/oauth-callback",
+        get(move |Query(params): Query<HashMap<String, String>>| {
+            let tx = tx.clone();
+            let client = client.clone();
+            let state_expected = state_clone.clone();
+            let redirect_uri = redirect_uri_clone.clone();
+
+            async move {
+                let code = params.get("code");
+                let returned_state = params.get("state");
+                let error = params.get("error");
+
+                // 检查错误
+                if let Some(err) = error {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", err);
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(format!("OAuth 错误: {}", err)));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 state
+                if returned_state.map(|s| s.as_str()) != Some(&state_expected) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "State 验证失败");
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err("State 验证失败".to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 检查 code
+                let code = match code {
+                    Some(c) => c,
+                    None => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", "未收到授权码");
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err("未收到授权码".to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                // 交换 Token
+                let token_result = exchange_code_for_token(&client, code, &redirect_uri).await;
+                let token_data = match token_result {
+                    Ok(data) => data,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &e.to_string());
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                let access_token = token_data["access_token"].as_str().unwrap_or_default();
+                let refresh_token = token_data["refresh_token"].as_str().map(|s| s.to_string());
+                let expires_in = token_data["expires_in"].as_i64();
+
+                // 获取用户邮箱
+                let email = fetch_user_email(&client, access_token).await.ok().flatten();
+
+                // 获取项目 ID
+                // 参考 antigravity2api-nodejs 的逻辑：
+                // - projectId === undefined -> 无资格（但我们改为使用随机 ID，因为很多账号都没有 projectId）
+                // - projectId === "" -> 有资格但无 projectId，使用随机生成的
+                // - projectId 有值 -> 有资格且有 projectId
+                let project_id = if skip_project_id_fetch {
+                    tracing::info!("[Antigravity OAuth] 跳过 projectId 获取，使用随机生成的 ID");
+                    Some(generate_project_id())
+                } else {
+                    match fetch_project_id_for_oauth(&client, access_token).await {
+                        Ok(Some(FetchedProjectId::HasProject(pid))) => {
+                            // 有资格且有 projectId
+                            Some(pid)
+                        }
+                        Ok(Some(FetchedProjectId::NoProject)) => {
+                            // 有资格但 projectId 为空，使用随机生成的
+                            tracing::info!("[Antigravity OAuth] projectId 为空，使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Ok(None) => {
+                            // 字段不存在，也使用随机 ID（很多账号都是这种情况）
+                            tracing::warn!("[Antigravity OAuth] 无法获取 projectId（字段不存在），使用随机生成的 ID");
+                            Some(generate_project_id())
+                        }
+                        Err(e) => {
+                            tracing::warn!("[Antigravity OAuth] 获取 projectId 失败: {}, 使用随机 ID", e);
+                            Some(generate_project_id())
+                        }
+                    }
+                };
+
+                // 构建凭证
+                let now = chrono::Utc::now();
+                let mut credentials = AntigravityCredentials {
+                    access_token: Some(access_token.to_string()),
+                    refresh_token,
+                    token_type: Some("Bearer".to_string()),
+                    expiry_date: expires_in.map(|e| (now + chrono::Duration::seconds(e)).timestamp_millis()),
+                    expire: expires_in.map(|e| (now + chrono::Duration::seconds(e)).to_rfc3339()),
+                    scope: Some(OAUTH_SCOPES.join(" ")),
+                    last_refresh: Some(now.to_rfc3339()),
+                    cred_type: "antigravity".to_string(),
+                    expires_in,
+                    timestamp: Some(now.timestamp_millis()),
+                    enable: Some(true),
+                    projectId: project_id,
+                    email: email.clone(),
+                };
+
+                // 保存凭证到应用数据目录
+                let creds_dir = dirs::data_dir()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join("proxycast")
+                    .join("credentials")
+                    .join("antigravity");
+
+                if let Err(e) = std::fs::create_dir_all(&creds_dir) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("创建目录失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                // 使用 UUID 作为文件名
+                let file_name = format!("{}.json", Uuid::new_v4());
+                let creds_path = creds_dir.join(&file_name);
+
+                let creds_json = match serde_json::to_string_pretty(&credentials) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("序列化失败: {}", e));
+                        if let Some(sender) = tx.lock().await.take() {
+                            let _ = sender.send(Err(e.to_string()));
+                        }
+                        return Html(html);
+                    }
+                };
+
+                if let Err(e) = std::fs::write(&creds_path, &creds_json) {
+                    let html = OAUTH_ERROR_HTML.replace("ERROR_PLACEHOLDER", &format!("保存凭证失败: {}", e));
+                    if let Some(sender) = tx.lock().await.take() {
+                        let _ = sender.send(Err(e.to_string()));
+                    }
+                    return Html(html);
+                }
+
+                let creds_path_str = creds_path.to_string_lossy().to_string();
+                tracing::info!("[Antigravity OAuth] 凭证已保存到: {}", creds_path_str);
+
+                // 发送成功结果
+                let result = AntigravityOAuthResult {
+                    credentials,
+                    creds_file_path: creds_path_str,
+                };
+
+                if let Some(sender) = tx.lock().await.take() {
+                    let _ = sender.send(Ok(result));
+                }
+
+                let email_display = email.unwrap_or_else(|| "未知邮箱".to_string());
+                let html = OAUTH_SUCCESS_HTML.replace("EMAIL_PLACEHOLDER", &email_display);
+                Html(html)
+            }
+        }),
+    );
+
+    // 生成授权 URL
+    let auth_url = generate_auth_url(port, &state);
+
+    // 打开浏览器
+    tracing::info!("[Antigravity OAuth] 打开浏览器进行授权: {}", auth_url);
+    if let Err(e) = open::that(&auth_url) {
+        tracing::warn!("[Antigravity OAuth] 无法自动打开浏览器: {}", e);
+    }
+
+    // 启动服务器
+    let server = axum::serve(listener, app);
+
+    // 同时运行服务器和等待回调结果
+    tokio::select! {
+        // 等待回调结果（带超时）
+        result = async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(300),
+                rx
+            ).await
+        } => {
+            match result {
+                Ok(Ok(Ok(r))) => Ok(r),
+                Ok(Ok(Err(e))) => Err(e.into()),
+                Ok(Err(_)) => Err("OAuth 回调通道关闭".into()),
+                Err(_) => Err("OAuth 登录超时（5分钟）".into()),
+            }
+        }
+        // 服务器运行（不会主动结束，除非出错）
+        server_result = server => {
+            match server_result {
+                Ok(_) => Err("服务器意外关闭".into()),
+                Err(e) => Err(format!("服务器错误: {}", e).into()),
+            }
+        }
     }
 }

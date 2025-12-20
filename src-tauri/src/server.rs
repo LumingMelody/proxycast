@@ -5,7 +5,7 @@ use crate::config::{
 };
 use crate::converter::anthropic_to_openai::convert_anthropic_to_openai;
 use crate::converter::openai_to_antigravity::{
-    convert_antigravity_to_openai_response, convert_openai_to_antigravity,
+    convert_antigravity_to_openai_response, convert_openai_to_antigravity_with_context,
 };
 use crate::credential::CredentialSyncService;
 use crate::database::dao::provider_pool::ProviderPoolDao;
@@ -14,6 +14,7 @@ use crate::injection::Injector;
 use crate::logger::LogStore;
 use crate::models::anthropic::*;
 use crate::models::openai::*;
+use crate::models::provider_pool_model::CredentialData;
 use crate::models::route_model::{RouteInfo, RouteListResponse};
 use crate::processor::{RequestContext, RequestProcessor};
 use crate::providers::antigravity::AntigravityProvider;
@@ -772,6 +773,8 @@ async fn run_server(
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/messages", post(anthropic_messages))
         .route("/v1/messages/count_tokens", post(count_tokens))
+        // Gemini 原生协议路由
+        .route("/v1/gemini/*path", post(gemini_generate_content))
         // WebSocket 路由
         .route("/v1/ws", get(ws_upgrade_handler))
         .route("/ws", get(ws_upgrade_handler))
@@ -2016,6 +2019,334 @@ async fn count_tokens(
     .into_response()
 }
 
+/// Gemini 原生协议处理
+/// 路由: POST /v1/gemini/{model}:{method}
+/// 例如: /v1/gemini/gemini-3-pro-preview:generateContent
+async fn gemini_generate_content(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(path): Path<String>,
+    Json(request): Json<serde_json::Value>,
+) -> Response {
+    if let Err(e) = verify_api_key(&headers, &state.api_key).await {
+        return e.into_response();
+    }
+
+    // 解析路径: {model}:{method}
+    // 例如: gemini-3-pro-preview:generateContent
+    let parts: Vec<&str> = path.splitn(2, ':').collect();
+    if parts.len() != 2 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": {
+                    "message": format!("无效的路径格式: {}，期望格式: model:method", path)
+                }
+            })),
+        )
+            .into_response();
+    }
+
+    let model = parts[0];
+    let method = parts[1];
+
+    state.logs.write().await.add(
+        "info",
+        &format!(
+            "[GEMINI] POST /v1/gemini/{} model={} method={}",
+            path, model, method
+        ),
+    );
+
+    // 目前只支持 generateContent 方法
+    if method != "generateContent" && method != "streamGenerateContent" {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": {
+                    "message": format!("不支持的方法: {}，目前只支持 generateContent", method)
+                }
+            })),
+        )
+            .into_response();
+    }
+
+    let is_stream = method == "streamGenerateContent";
+
+    // 获取默认 provider
+    let default_provider = state.default_provider.read().await.clone();
+
+    // 尝试从凭证池中选择 Antigravity 凭证
+    let credential = match &state.db {
+        Some(db) => state
+            .pool_service
+            .select_credential(db, &default_provider, Some(model))
+            .ok()
+            .flatten(),
+        None => None,
+    };
+
+    let cred = match credential {
+        Some(c) => c,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": "没有可用的 Antigravity 凭证，请先添加凭证"
+                    }
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    state.logs.write().await.add(
+        "info",
+        &format!(
+            "[GEMINI] 使用凭证: type={} name={:?} uuid={}",
+            cred.provider_type,
+            cred.name,
+            &cred.uuid[..8]
+        ),
+    );
+
+    // 调用 Antigravity Provider
+    match &cred.credential {
+        CredentialData::AntigravityOAuth {
+            creds_file_path,
+            project_id,
+        } => {
+            let mut antigravity = AntigravityProvider::new();
+            if let Err(e) = antigravity
+                .load_credentials_from_path(creds_file_path)
+                .await
+            {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": {
+                            "message": format!("加载 Antigravity 凭证失败: {}", e)
+                        }
+                    })),
+                )
+                    .into_response();
+            }
+
+            // 检查并刷新 token
+            if antigravity.is_token_expiring_soon() {
+                if let Err(e) = antigravity.refresh_token().await {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(serde_json::json!({
+                            "error": {
+                                "message": format!("Token 刷新失败: {}", e)
+                            }
+                        })),
+                    )
+                        .into_response();
+                }
+            }
+
+            // 设置项目 ID
+            if let Some(pid) = project_id {
+                antigravity.project_id = Some(pid.clone());
+            } else if antigravity.project_id.is_none() {
+                // 如果凭证中没有 project_id，尝试从 API 获取或生成随机 ID
+                if let Err(e) = antigravity.discover_project().await {
+                    tracing::warn!("[Antigravity] 获取项目 ID 失败: {}，使用随机生成的 ID", e);
+                    // 生成随机项目 ID
+                    let uuid = uuid::Uuid::new_v4();
+                    let bytes = uuid.as_bytes();
+                    let adjectives = ["useful", "bright", "swift", "calm", "bold"];
+                    let nouns = ["fuze", "wave", "spark", "flow", "core"];
+                    let adj = adjectives[(bytes[0] as usize) % adjectives.len()];
+                    let noun = nouns[(bytes[1] as usize) % nouns.len()];
+                    let random_part: String = uuid.to_string()[..5].to_lowercase();
+                    antigravity.project_id = Some(format!("{}-{}-{}", adj, noun, random_part));
+                }
+            }
+
+            let proj_id = antigravity.project_id.clone().unwrap_or_else(|| {
+                // 最后的后备：生成随机 ID
+                let uuid = uuid::Uuid::new_v4();
+                format!("proxycast-{}", &uuid.to_string()[..8])
+            });
+
+            state
+                .logs
+                .write()
+                .await
+                .add("debug", &format!("[GEMINI] 使用 project_id: {}", proj_id));
+
+            // 构建 Antigravity 请求体
+            // 直接使用用户传入的 Gemini 格式请求，只添加必要的字段
+            let antigravity_request = build_gemini_native_request(&request, model, &proj_id);
+
+            state.logs.write().await.add(
+                "debug",
+                &format!(
+                    "[GEMINI] 请求体: {}",
+                    serde_json::to_string(&antigravity_request).unwrap_or_default()
+                ),
+            );
+
+            if is_stream {
+                // 流式响应 - 暂不支持，返回错误
+                return (
+                    StatusCode::NOT_IMPLEMENTED,
+                    Json(serde_json::json!({
+                        "error": {
+                            "message": "流式响应暂不支持，请使用 generateContent"
+                        }
+                    })),
+                )
+                    .into_response();
+            }
+
+            // 非流式响应
+            match antigravity
+                .call_api("generateContent", &antigravity_request)
+                .await
+            {
+                Ok(resp) => {
+                    state.logs.write().await.add(
+                        "info",
+                        &format!(
+                            "[GEMINI] 响应成功: {}",
+                            serde_json::to_string(&resp)
+                                .unwrap_or_default()
+                                .chars()
+                                .take(200)
+                                .collect::<String>()
+                        ),
+                    );
+
+                    // 直接返回 Gemini 格式响应
+                    Json(resp).into_response()
+                }
+                Err(e) => {
+                    state
+                        .logs
+                        .write()
+                        .await
+                        .add("error", &format!("[GEMINI] 请求失败: {}", e));
+
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": {
+                                "message": e.to_string()
+                            }
+                        })),
+                    )
+                        .into_response()
+                }
+            }
+        }
+        _ => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": {
+                    "message": "Gemini 原生协议只支持 Antigravity 凭证"
+                }
+            })),
+        )
+            .into_response(),
+    }
+}
+
+/// 构建 Gemini 原生请求体
+/// 将用户传入的 Gemini 格式请求转换为 Antigravity 请求格式
+fn build_gemini_native_request(
+    request: &serde_json::Value,
+    model: &str,
+    project_id: &str,
+) -> serde_json::Value {
+    use crate::converter::openai_to_antigravity::ThinkingConfig;
+
+    // 模型名称映射
+    let actual_model = match model {
+        "gemini-2.5-computer-use-preview-10-2025" => "rev19-uic3-1p",
+        "gemini-3-pro-image-preview" => "gemini-3-pro-image",
+        "gemini-3-pro-preview" => "gemini-3-pro-high",
+        "gemini-claude-sonnet-4-5" => "claude-sonnet-4-5",
+        "gemini-claude-sonnet-4-5-thinking" => "claude-sonnet-4-5-thinking",
+        _ => model,
+    };
+
+    // 是否启用思维链
+    let enable_thinking = model.ends_with("-thinking")
+        || model == "gemini-2.5-pro"
+        || model.starts_with("gemini-3-pro-")
+        || model == "rev19-uic3-1p"
+        || model == "gpt-oss-120b-medium";
+
+    // 生成请求 ID 和会话 ID
+    let request_id = format!("agent-{}", uuid::Uuid::new_v4());
+    let session_id = {
+        let uuid = uuid::Uuid::new_v4();
+        let bytes = uuid.as_bytes();
+        let n: u64 = u64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]) % 9_000_000_000_000_000_000;
+        format!("-{}", n)
+    };
+
+    // 构建内部请求
+    let mut inner_request = request.clone();
+
+    // 添加会话 ID
+    inner_request["sessionId"] = serde_json::json!(session_id);
+
+    // 确保有 generationConfig
+    if inner_request.get("generationConfig").is_none() {
+        inner_request["generationConfig"] = serde_json::json!({
+            "temperature": 1.0,
+            "maxOutputTokens": 8096,
+            "topP": 0.85,
+            "topK": 50,
+            "candidateCount": 1,
+            "stopSequences": [
+                "<|user|>",
+                "<|bot|>",
+                "<|context_request|>",
+                "<|endoftext|>",
+                "<|end_of_turn|>"
+            ],
+            "thinkingConfig": {
+                "includeThoughts": enable_thinking,
+                "thinkingBudget": if enable_thinking { 1024 } else { 0 }
+            }
+        });
+    } else {
+        // 确保有 thinkingConfig
+        if inner_request["generationConfig"]
+            .get("thinkingConfig")
+            .is_none()
+        {
+            inner_request["generationConfig"]["thinkingConfig"] = serde_json::json!({
+                "includeThoughts": enable_thinking,
+                "thinkingBudget": if enable_thinking { 1024 } else { 0 }
+            });
+        }
+    }
+
+    // 删除安全设置（Antigravity 不支持）
+    if let Some(obj) = inner_request.as_object_mut() {
+        obj.remove("safetySettings");
+    }
+
+    // 构建完整的 Antigravity 请求体
+    serde_json::json!({
+        "project": project_id,
+        "requestId": request_id,
+        "request": inner_request,
+        "model": actual_model,
+        "userAgent": "antigravity"
+    })
+}
+
 /// CodeWhisperer 响应解析结果
 #[derive(Debug, Default)]
 struct CWParsedResponse {
@@ -3016,7 +3347,7 @@ async fn chat_completions_internal(state: &AppState, request: &ChatCompletionReq
     }
 }
 
-use crate::models::provider_pool_model::{CredentialData, ProviderCredential};
+use crate::models::provider_pool_model::ProviderCredential;
 
 /// 根据凭证调用 Provider (Anthropic 格式)
 async fn call_provider_anthropic(
@@ -3304,9 +3635,12 @@ async fn call_provider_anthropic(
                 tracing::warn!("[Antigravity] Failed to discover project: {}", e);
             }
 
+            // 获取 project_id 用于请求
+            let proj_id = antigravity.project_id.clone().unwrap_or_default();
+
             // 先转换为 OpenAI 格式，再转换为 Antigravity 格式
             let openai_request = convert_anthropic_to_openai(request);
-            let antigravity_request = convert_openai_to_antigravity(&openai_request);
+            let antigravity_request = convert_openai_to_antigravity_with_context(&openai_request, &proj_id);
 
             match antigravity
                 .generate_content(&request.model, &antigravity_request)
@@ -3810,8 +4144,11 @@ async fn call_provider_openai(
                 tracing::warn!("[Antigravity] Failed to discover project: {}", e);
             }
 
+            // 获取 project_id 用于请求
+            let proj_id = antigravity.project_id.clone().unwrap_or_default();
+
             // 转换请求格式
-            let antigravity_request = convert_openai_to_antigravity(request);
+            let antigravity_request = convert_openai_to_antigravity_with_context(request, &proj_id);
 
             match antigravity.generate_content(&request.model, &antigravity_request).await {
                 Ok(resp) => {
@@ -4595,7 +4932,8 @@ async fn call_provider_openai_for_ws(
             }
         }
         CredentialData::AntigravityOAuth {
-            creds_file_path, ..
+            creds_file_path,
+            project_id,
         } => {
             let mut antigravity = AntigravityProvider::new();
             if let Err(e) = antigravity
@@ -4623,7 +4961,14 @@ async fn call_provider_openai_for_ws(
                     return Err(e.to_string());
                 }
             }
-            let antigravity_request = convert_openai_to_antigravity(request);
+
+            // 设置项目 ID
+            if let Some(pid) = project_id {
+                antigravity.project_id = Some(pid.clone());
+            }
+            let proj_id = antigravity.project_id.clone().unwrap_or_default();
+
+            let antigravity_request = convert_openai_to_antigravity_with_context(request, &proj_id);
             match antigravity
                 .call_api("generateContent", &antigravity_request)
                 .await
