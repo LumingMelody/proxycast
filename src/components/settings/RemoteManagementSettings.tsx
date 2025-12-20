@@ -90,6 +90,11 @@ export function RemoteManagementSettings() {
   const rm = config.remote_management;
   const isEnabled = Boolean(rm.secret_key && rm.secret_key.length > 0);
   const remoteAccessSupported = false;
+  const allowRemoteToggleEnabled = remoteAccessSupported && isEnabled;
+  const allowRemoteToggleDisabled =
+    !allowRemoteToggleEnabled && !rm.allow_remote;
+  const remoteAccessUnsupportedEnabled =
+    rm.allow_remote && !remoteAccessSupported;
 
   return (
     <div className="space-y-4">
@@ -187,7 +192,7 @@ export function RemoteManagementSettings() {
 
         {/* 允许远程访问 */}
         <label
-          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${!isEnabled || !remoteAccessSupported ? "opacity-50 pointer-events-none" : ""}`}
+          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 ${allowRemoteToggleDisabled ? "opacity-50 pointer-events-none" : ""}`}
         >
           <div>
             <span className="text-sm font-medium">允许远程访问</span>
@@ -198,11 +203,14 @@ export function RemoteManagementSettings() {
           <input
             type="checkbox"
             checked={rm.allow_remote}
-            onChange={(e) =>
-              updateRemoteManagement({ allow_remote: e.target.checked })
-            }
+            onChange={(e) => {
+              if (e.target.checked && !allowRemoteToggleEnabled) {
+                return;
+              }
+              updateRemoteManagement({ allow_remote: e.target.checked });
+            }}
             className="w-4 h-4 rounded border-gray-300"
-            disabled={!isEnabled || !remoteAccessSupported}
+            disabled={allowRemoteToggleDisabled}
           />
         </label>
 
@@ -241,7 +249,7 @@ export function RemoteManagementSettings() {
 
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || remoteAccessUnsupportedEnabled}
           className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
         >
           {saving ? "保存中..." : "保存远程管理设置"}

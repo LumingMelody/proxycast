@@ -92,6 +92,7 @@ export function TlsSettings() {
   const tlsSupported = false;
   const tls = config.server.tls;
   const isConfigValid = !tls.enable || (tls.cert_path && tls.key_path);
+  const tlsUnsupportedEnabled = tls.enable && !tlsSupported;
 
   return (
     <div className="space-y-4">
@@ -143,8 +144,13 @@ export function TlsSettings() {
           <input
             type="checkbox"
             checked={tls.enable}
-            onChange={(e) => updateTls({ enable: e.target.checked })}
-            disabled={!tlsSupported}
+            onChange={(e) => {
+              if (!tlsSupported && e.target.checked) {
+                return;
+              }
+              updateTls({ enable: e.target.checked });
+            }}
+            disabled={!tlsSupported && !tls.enable}
             className="w-4 h-4 rounded border-gray-300"
           />
         </label>
@@ -221,7 +227,9 @@ export function TlsSettings() {
 
         <button
           onClick={handleSave}
-          disabled={saving || !tlsSupported || (tls.enable && !isConfigValid)}
+          disabled={
+            saving || tlsUnsupportedEnabled || (tls.enable && !isConfigValid)
+          }
           className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
         >
           {saving ? "保存中..." : "保存 TLS 设置"}
