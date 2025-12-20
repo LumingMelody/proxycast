@@ -52,17 +52,24 @@ fn get_raw_machine_id() -> Option<String> {
             .map(|s| s.trim().to_lowercase())
     } else if cfg!(target_os = "windows") {
         // Windows: 使用 wmic 获取系统 UUID
-        Command::new("wmic")
-            .args(["csproduct", "get", "UUID"])
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .and_then(|s| {
-                s.lines()
-                    .skip(1) // 跳过表头
-                    .find(|l| !l.trim().is_empty())
-                    .map(|s| s.trim().to_lowercase())
-            })
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            Command::new("wmic")
+                .args(["csproduct", "get", "UUID"])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .and_then(|s| {
+                    s.lines()
+                        .skip(1) // 跳过表头
+                        .find(|l| !l.trim().is_empty())
+                        .map(|s| s.trim().to_lowercase())
+                })
+        }
+        #[cfg(not(target_os = "windows"))]
+        None
     } else {
         None
     }

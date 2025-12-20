@@ -171,6 +171,7 @@ fn get_raw_machine_id() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // Windows: 使用注册表中的 MachineGuid
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
         let output = Command::new("reg")
             .args([
@@ -179,6 +180,7 @@ fn get_raw_machine_id() -> Result<String, String> {
                 "/v",
                 "MachineGuid",
             ])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .output()
             .map_err(|e| format!("执行 reg query 失败: {}", e))?;
 
