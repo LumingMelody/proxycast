@@ -32,6 +32,9 @@ jobs:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             name: Linux-x64
+          - platform: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+            name: Linux-arm64
 
     runs-on: ${{ matrix.platform }}
     
@@ -45,11 +48,38 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install Linux dependencies (x64)
+        if: matrix.platform == 'ubuntu-22.04' && matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install Linux ARM64 cross-compilation dependencies
+        if: matrix.platform == 'ubuntu-22.04' && matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+          # 添加 ARM64 架构支持
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+
+          # 安装 ARM64 系统库
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libappindicator3-dev:arm64 \
+            librsvg2-dev:arm64 \
+            libssl-dev:arm64 \
+            libgtk-3-dev:arm64
+
+          # 设置 PKG_CONFIG 环境变量
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+
+          # 设置 Cargo 环境变量
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -87,7 +117,8 @@ jobs:
             - **macOS (Apple Silicon)**: `proxycast_*_aarch64.dmg`
             - **macOS (Intel)**: `proxycast_*_x64.dmg`
             - **Windows (64-bit)**: `proxycast_*_x64-setup.exe`
-            - **Linux (64-bit)**: `proxycast_*_amd64.deb` / `proxycast_*_amd64.AppImage`
+            - **Linux x64**: `proxycast_*_amd64.deb` / `proxycast_*_amd64.AppImage`
+            - **Linux ARM64**: `proxycast_*_arm64.deb` / `proxycast_*_arm64.AppImage`
             
             ### macOS 首次安装
             
