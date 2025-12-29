@@ -3,8 +3,8 @@
 //! 测试 AsterClient 的序列化、反序列化和 URL 格式
 
 use proxycast_lib::agent::{
-    AsterClient, ChatRequest, ChatResponse, CreateAgentData, CreateAgentRequest,
-    CreateAgentResponse, ModelConfig, SendToAgentRequest, SendToAgentResponse,
+    AsterClient, ChatRequest, ChatResponse, CreateAgentRequest, CreateAgentResponse, ModelConfig,
+    SendToAgentRequest, SendToAgentResponse,
 };
 
 #[test]
@@ -79,7 +79,8 @@ fn test_chat_request_serialization() {
 
     let request = ChatRequest {
         template_id: "chat".to_string(),
-        input: "Hello, world!".to_string(),
+        input: Some("Hello, world!".to_string()),
+        images: None,
         model_config: Some(config),
     };
 
