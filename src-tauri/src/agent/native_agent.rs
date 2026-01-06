@@ -321,6 +321,7 @@ impl NativeAgent {
                 &config,
                 tools,
                 tx,
+                self.provider_id.as_deref(),
             )
             .await?;
 
@@ -488,6 +489,7 @@ impl NativeAgent {
                 &config,
                 tools,
                 tx,
+                self.provider_id.as_deref(),
             )
             .await?;
 

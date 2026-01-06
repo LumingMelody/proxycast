@@ -141,6 +141,13 @@ impl AwsEventStreamParser {
             return Vec::new();
         }
 
+        // 调试日志：记录接收到的字节
+        tracing::debug!(
+            "[AWS_PARSER] 收到 {} 字节, 缓冲区当前 {} 字节",
+            bytes.len(),
+            self.buffer.len()
+        );
+
         // 更新状态
         if self.state == ParserState::Idle {
             self.state = ParserState::Parsing;
@@ -149,6 +156,12 @@ impl AwsEventStreamParser {
         // 检查缓冲区大小限制
         if self.buffer.len() + bytes.len() > self.max_buffer_size {
             self.parse_error_count += 1;
+            tracing::error!(
+                "[AWS_PARSER] 缓冲区溢出: {} + {} > {}",
+                self.buffer.len(),
+                bytes.len(),
+                self.max_buffer_size
+            );
             return vec![StreamEvent::Error {
                 error_type: "buffer_overflow".to_string(),
                 message: "缓冲区溢出".to_string(),
@@ -159,7 +172,15 @@ impl AwsEventStreamParser {
         self.buffer.extend_from_slice(bytes);
 
         // 解析缓冲区中的所有完整 JSON 对象
-        self.parse_buffer()
+        let events = self.parse_buffer();
+
+        tracing::debug!(
+            "[AWS_PARSER] 解析出 {} 个事件, 缓冲区剩余 {} 字节",
+            events.len(),
+            self.buffer.len()
+        );
+
+        events
     }
 
     /// 完成解析
@@ -196,6 +217,7 @@ impl AwsEventStreamParser {
     fn parse_buffer(&mut self) -> Vec<StreamEvent> {
         let mut events = Vec::new();
         let mut pos = 0;
+        let mut json_count = 0;
 
         while pos < self.buffer.len() {
             // 查找下一个 JSON 对象的开始位置
@@ -207,10 +229,30 @@ impl AwsEventStreamParser {
             // 提取 JSON 对象
             match self.extract_json(start) {
                 Some((json_str, end_pos)) => {
+                    json_count += 1;
+                    // 调试日志：记录解析到的 JSON
+                    tracing::debug!(
+                        "[AWS_PARSER] 解析 JSON #{}: {}",
+                        json_count,
+                        if json_str.len() > 100 {
+                            format!("{}...", &json_str[..100])
+                        } else {
+                            json_str.clone()
+                        }
+                    );
+
                     // 解析 JSON 并生成事件
                     match self.parse_json_event(&json_str) {
-                        Ok(event_list) => events.extend(event_list),
+                        Ok(event_list) => {
+                            tracing::debug!(
+                                "[AWS_PARSER] JSON #{} 生成 {} 个事件",
+                                json_count,
+                                event_list.len()
+                            );
+                            events.extend(event_list);
+                        }
                         Err(e) => {
+                            tracing::warn!("[AWS_PARSER] JSON #{} 解析错误: {}", json_count, e);
                             self.parse_error_count += 1;
                             events.push(StreamEvent::Error {
                                 error_type: "parse_error".to_string(),
@@ -222,6 +264,11 @@ impl AwsEventStreamParser {
                 }
                 None => {
                     // JSON 对象不完整，等待更多数据
+                    tracing::debug!(
+                        "[AWS_PARSER] JSON 不完整，等待更多数据 (pos={}, buffer_len={})",
+                        pos,
+                        self.buffer.len()
+                    );
                     break;
                 }
             }
