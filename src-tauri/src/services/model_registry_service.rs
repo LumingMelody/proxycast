@@ -14,8 +14,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// 内嵌的模型资源目录名
-const MODELS_RESOURCE_DIR: &str = "models";
+/// 内嵌的模型资源目录名（相对于 resource_dir）
+/// 对应 tauri.conf.json 中的 "resources/models/**/*"
+const MODELS_RESOURCE_DIR: &str = "resources/models";
 
 /// 仓库索引文件结构
 #[derive(Debug, Deserialize)]
