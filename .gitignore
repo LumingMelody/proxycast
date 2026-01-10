@@ -27,3 +27,6 @@ __pycache__/
 .kiro/
 .history
 docs/prd/
+
+# Issues tracking (internal use only)
+.issues/
