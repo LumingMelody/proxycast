@@ -8,6 +8,7 @@
 
 #[cfg(test)]
 mod tests {
+    #![allow(dead_code)]
     use super::super::*;
     use serde_json::json;
     use std::fs;
@@ -288,7 +289,6 @@ mod tests {
 
     #[cfg(test)]
     mod shell_config_write_tests {
-        use super::*;
 
         /// **Feature: shell-write, Property 1: 特殊字符转义**
         #[test]
@@ -307,7 +307,7 @@ mod tests {
             // 这个测试验证特殊字符转义逻辑
             // 实际的 write_env_to_shell_config 会写入真实的 shell 配置文件
             // 在单元测试中，我们只验证转义逻辑是正确的
-            for (key, value) in &env_vars {
+            for (_key, value) in &env_vars {
                 // 验证值包含特殊字符
                 assert!(
                     value.contains('"') || value.contains('\\'),

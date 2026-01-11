@@ -274,12 +274,12 @@ mod tests {
         }
     }
 
-    /// **Feature: skills-platform-mvp, Property 2: Installed Skills Discovery**
-    /// **Validates: Requirements 2.1, 2.2, 2.3**
-    ///
-    /// *For any* valid ~/.proxycast/skills/ directory containing subdirectories
-    /// with SKILL.md files, calling `scan_installed_skills()` SHALL return a list
-    /// containing exactly those subdirectory names.
+    // **Feature: skills-platform-mvp, Property 2: Installed Skills Discovery**
+    // **Validates: Requirements 2.1, 2.2, 2.3**
+    //
+    // *For any* valid ~/.proxycast/skills/ directory containing subdirectories
+    // with SKILL.md files, calling `scan_installed_skills()` SHALL return a list
+    // containing exactly those subdirectory names.
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 

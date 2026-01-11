@@ -256,28 +256,33 @@ impl Default for UpdateCheckService {
 /// 发送系统通知（跨平台）
 ///
 /// 使用 Tauri 的通知 API 发送原生系统通知
-#[cfg(feature = "notification")]
-pub async fn send_update_notification(
-    app_handle: &tauri::AppHandle,
-    update_info: &UpdateInfo,
-) -> Result<(), String> {
-    use tauri::api::notification::Notification;
-
-    if !update_info.has_update {
-        return Ok(());
-    }
-
-    let latest = update_info.latest_version.as_deref().unwrap_or("未知版本");
-
-    Notification::new(&app_handle.config().tauri.bundle.identifier)
-        .title("ProxyCast 有新版本可用")
-        .body(&format!(
-            "新版本 {} 已发布，当前版本 {}",
-            latest, update_info.current_version
-        ))
-        .show()
-        .map_err(|e| format!("发送通知失败: {}", e))
-}
+///
+/// TODO: 此功能暂时禁用，需要迁移到 Tauri v2 的通知插件 API
+/// 参考：https://v2.tauri.app/plugin/notification/
+// #[cfg(feature = "notification")]
+// pub async fn send_update_notification(
+//     app_handle: &tauri::AppHandle,
+//     update_info: &UpdateInfo,
+// ) -> Result<(), String> {
+//     use tauri_plugin_notification::NotificationExt;
+//
+//     if !update_info.has_update {
+//         return Ok(());
+//     }
+//
+//     let latest = update_info.latest_version.as_deref().unwrap_or("未知版本");
+//
+//     app_handle
+//         .notification()
+//         .builder()
+//         .title("ProxyCast 有新版本可用")
+//         .body(&format!(
+//             "新版本 {} 已发布，当前版本 {}",
+//             latest, update_info.current_version
+//         ))
+//         .show()
+//         .map_err(|e| format!("发送通知失败: {}", e))
+// }
 
 /// 更新检查服务状态包装器（用于 Tauri 状态管理）
 pub struct UpdateCheckServiceState(pub Arc<RwLock<UpdateCheckService>>);

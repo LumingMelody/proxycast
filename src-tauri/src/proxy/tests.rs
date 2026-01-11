@@ -2,6 +2,8 @@
 //!
 //! 使用 proptest 进行属性测试
 
+#![allow(dead_code)]
+
 use crate::proxy::{ProxyClientFactory, ProxyError, ProxyProtocol};
 use proptest::prelude::*;
 

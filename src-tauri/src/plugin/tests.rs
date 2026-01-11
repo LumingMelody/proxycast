@@ -181,7 +181,7 @@ use proptest::prelude::*;
 mod property_tests {
     use super::*;
     use crate::plugin::manager::{PluginManager, PluginManagerConfig};
-    use std::path::PathBuf;
+
     use tempfile::TempDir;
 
     /// 生成随机的请求 JSON

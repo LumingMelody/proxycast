@@ -490,6 +490,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    #![allow(dead_code)]
     use super::*;
     use crate::agent::tools::read_file::ReadFileTool;
     use proptest::prelude::*;

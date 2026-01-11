@@ -2,10 +2,11 @@
 //!
 //! 使用 proptest 进行属性测试
 
+#![allow(dead_code)]
+
 use crate::config::RemoteManagementConfig;
 use crate::middleware::management_auth::{
     clear_auth_failure_state, clear_auth_failure_state_for, ManagementAuthLayer,
-    ManagementAuthService,
 };
 use axum::{
     body::Body,

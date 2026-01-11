@@ -47,8 +47,6 @@ fn get_local_ip() -> Option<String> {
 ///
 /// 返回所有非回环的 IPv4 地址，过滤掉 VPN 和虚拟网卡
 fn get_all_local_ips() -> Vec<String> {
-    use std::net::Ipv4Addr;
-
     let mut ips = Vec::new();
 
     // 使用 if-addrs crate 获取所有网络接口

@@ -443,6 +443,7 @@ impl ProviderAliasConfig {
 
 /// models.dev API 响应中的 Provider 结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ModelsDevProvider {
     pub id: String,
     pub name: String,

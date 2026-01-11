@@ -1,4 +1,4 @@
-use crate::browser_interceptor::{BrowserInterceptorError, InterceptedUrl, Result};
+use crate::browser_interceptor::{InterceptedUrl, Result};
 
 /// Linux 平台的浏览器拦截器
 pub struct LinuxInterceptor {
@@ -60,7 +60,7 @@ impl LinuxInterceptor {
 impl Drop for LinuxInterceptor {
     fn drop(&mut self) {
         if self.running {
-            tokio::runtime::Handle::try_current().map(|handle| {
+            let _ = tokio::runtime::Handle::try_current().map(|handle| {
                 handle.block_on(async {
                     let _ = self.stop().await;
                     let _ = self.restore_system_defaults().await;

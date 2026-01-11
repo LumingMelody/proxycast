@@ -273,7 +273,6 @@ impl Default for KiroEventService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_credential_status_update_event() {

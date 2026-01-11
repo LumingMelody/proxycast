@@ -785,7 +785,7 @@ mod property_tests {
             let response = build_anthropic_response(&model, &parsed);
 
             // 获取响应体
-            let (parts, body) = response.into_parts();
+            let (parts, _body) = response.into_parts();
 
             // 验证状态码为 200
             prop_assert_eq!(parts.status, StatusCode::OK);
@@ -1073,6 +1073,7 @@ mod property_tests {
     // ========================================================================
 
     /// 获取模型名称映射的预期结果
+    #[allow(dead_code)]
     fn get_expected_model_mapping(model: &str) -> &str {
         match model {
             "gemini-2.5-computer-use-preview-10-2025" => "rev19-uic3-1p",

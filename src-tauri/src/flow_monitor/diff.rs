@@ -1141,8 +1141,8 @@ mod tests {
 mod property_tests {
     use super::*;
     use crate::flow_monitor::models::{
-        FlowAnnotations, FlowMetadata, FlowState, FlowTimestamps, FlowType, LLMRequest,
-        LLMResponse, Message, MessageRole, RequestParameters, TokenUsage,
+        FlowMetadata, FlowType, LLMRequest, LLMResponse, Message, MessageRole, RequestParameters,
+        TokenUsage,
     };
     use crate::ProviderType;
     use chrono::Utc;

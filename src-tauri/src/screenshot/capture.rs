@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 use tauri::AppHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// 截图错误类型
 #[derive(Debug, thiserror::Error)]
@@ -229,7 +229,6 @@ pub fn cleanup_temp_file(path: &PathBuf) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_temp_path_generation() {

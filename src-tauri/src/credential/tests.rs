@@ -2,6 +2,8 @@
 //!
 //! 使用 proptest 进行属性测试
 
+#![allow(dead_code)]
+
 use crate::credential::{
     BalanceStrategy, Credential, CredentialData, CredentialPool, LoadBalancer,
 };
@@ -1861,7 +1863,7 @@ proptest! {
         active_count in 1usize..=5usize
     ) {
         // 创建两个管理器：一个立即过期，一个长时间冷却
-        let expired_config = QuotaExceededConfig {
+        let _expired_config = QuotaExceededConfig {
             switch_project: true,
             switch_preview_model: true,
             cooldown_seconds: 0, // 立即过期

@@ -1019,6 +1019,7 @@ mod tests {
 
 #[cfg(test)]
 mod property_tests {
+    #![allow(dead_code)]
     use super::*;
     use crate::flow_monitor::models::{
         FlowMetadata, FlowType, LLMRequest, LLMResponse, RequestParameters, TokenUsage,

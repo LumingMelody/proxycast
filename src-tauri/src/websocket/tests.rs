@@ -1,5 +1,7 @@
 //! WebSocket 模块测试
 
+#![allow(dead_code)]
+
 use super::*;
 
 #[test]

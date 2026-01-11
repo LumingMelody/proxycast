@@ -117,3 +117,4 @@ tempfile = "3"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+notification = []  # 预留特性：系统通知功能

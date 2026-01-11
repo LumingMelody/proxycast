@@ -915,8 +915,7 @@ pub fn get_filter_help() -> String {
 mod tests {
     use super::*;
     use crate::flow_monitor::models::{
-        FlowAnnotations, FlowMetadata, FlowTimestamps, FlowType, LLMRequest, LLMResponse,
-        RequestParameters, TokenUsage,
+        FlowMetadata, FlowType, LLMRequest, LLMResponse, RequestParameters, TokenUsage,
     };
     use crate::ProviderType;
 
@@ -1261,8 +1260,7 @@ mod tests {
 mod property_tests {
     use super::*;
     use crate::flow_monitor::models::{
-        FlowAnnotations, FlowError, FlowErrorType, FlowMetadata, FlowTimestamps, FlowType,
-        FunctionCall, LLMRequest, LLMResponse, Message, MessageContent, MessageRole,
+        FlowError, FlowErrorType, FlowMetadata, FlowType, FunctionCall, LLMRequest, LLMResponse,
         RequestParameters, ThinkingContent, TokenUsage, ToolCall,
     };
     use crate::ProviderType;

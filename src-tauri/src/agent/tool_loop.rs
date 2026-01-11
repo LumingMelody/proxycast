@@ -740,11 +740,6 @@ mod proptests {
         "[a-zA-Z0-9 ]{1,50}".prop_map(|s| s)
     }
 
-    /// 生成工具调用数量
-    fn arb_tool_call_count() -> impl Strategy<Value = usize> {
-        1..=5usize
-    }
-
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 

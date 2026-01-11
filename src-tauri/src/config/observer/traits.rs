@@ -46,6 +46,7 @@ pub trait ConfigObserver: Send + Sync {
 }
 
 /// 同步配置观察者 Trait（用于不需要异步的简单观察者）
+#[allow(dead_code)]
 pub trait SyncConfigObserver: Send + Sync {
     /// 观察者名称
     fn name(&self) -> &str;
@@ -69,6 +70,7 @@ pub trait SyncConfigObserver: Send + Sync {
 }
 
 /// 将同步观察者包装为异步观察者
+#[allow(dead_code)]
 pub struct SyncObserverWrapper<T: SyncConfigObserver>(pub Arc<T>);
 
 #[async_trait]

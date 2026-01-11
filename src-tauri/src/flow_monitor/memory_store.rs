@@ -571,9 +571,7 @@ impl FlowMemoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flow_monitor::models::{
-        FlowMetadata, FlowTimestamps, LLMRequest, RequestParameters,
-    };
+    use crate::flow_monitor::models::{FlowMetadata, LLMRequest, RequestParameters};
 
     /// 创建测试用的 Flow
     fn create_test_flow(id: &str, model: &str, provider: ProviderType) -> LLMFlow {
@@ -852,11 +850,9 @@ mod tests {
 
 #[cfg(test)]
 mod property_tests {
+    #![allow(dead_code)]
     use super::*;
-    use crate::flow_monitor::models::{
-        FlowAnnotations, FlowError, FlowErrorType, FlowMetadata, FlowTimestamps, LLMRequest,
-        LLMResponse, RequestParameters, ThinkingContent, TokenUsage,
-    };
+    use crate::flow_monitor::models::{FlowMetadata, LLMRequest, RequestParameters};
     use proptest::prelude::*;
 
     // ========================================================================

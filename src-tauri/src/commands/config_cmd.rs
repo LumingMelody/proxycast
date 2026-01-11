@@ -209,6 +209,7 @@ pub async fn set_auto_launch(app: AppHandle, enabled: bool) -> Result<bool, Stri
 
 /// 配置导出选项
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ExportOptions {
     /// 是否脱敏敏感信息（API 密钥等）
     pub redact_secrets: bool,
@@ -251,6 +252,7 @@ pub fn export_config(config: Config, redact_secrets: bool) -> Result<ExportResul
 
 /// 配置导入选项
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ImportOptions {
     /// 是否合并到现有配置（true）或替换（false）
     pub merge: bool,

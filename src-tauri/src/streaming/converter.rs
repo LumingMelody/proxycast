@@ -1193,9 +1193,7 @@ mod tests {
 #[cfg(test)]
 mod property_tests {
     use super::*;
-    use crate::streaming::aws_parser::{
-        extract_content, extract_tool_calls, serialize_event, AwsEvent,
-    };
+    use crate::streaming::aws_parser::{extract_content, serialize_event, AwsEvent};
     use proptest::prelude::*;
 
     // ========================================================================

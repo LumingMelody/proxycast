@@ -21,6 +21,7 @@ use proxycast_lib::flow_monitor::{
 use std::collections::HashMap;
 
 /// 端到端测试上下文
+#[allow(dead_code)]
 struct E2ETestContext {
     pub temp_dir: TempDir,
     pub flow_monitor: Arc<FlowMonitor>,

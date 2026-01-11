@@ -93,6 +93,7 @@ pub struct MachineIdHistory {
 
 /// 机器码操作类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum MachineIdOperation {
     /// 获取当前机器码
     Get,

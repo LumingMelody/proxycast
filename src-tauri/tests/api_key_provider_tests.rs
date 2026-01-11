@@ -12,11 +12,12 @@ use tempfile::TempDir;
 use proxycast_lib::database::dao::api_key_provider::{
     ApiKeyEntry, ApiKeyProvider, ApiKeyProviderDao, ApiProviderType, ProviderGroup,
 };
-use proxycast_lib::database::{init_database, DbConnection};
+use proxycast_lib::database::DbConnection;
 use proxycast_lib::services::api_key_provider_service::ApiKeyProviderService;
 use rusqlite::Connection;
 
 /// 测试上下文
+#[allow(dead_code)]
 struct TestContext {
     pub temp_dir: TempDir,
     pub db: DbConnection,

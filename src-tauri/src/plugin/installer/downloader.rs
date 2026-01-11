@@ -312,6 +312,7 @@ mod tests {
 /// **验证需求: 2.4, 3.1, 3.2**
 #[cfg(test)]
 mod property_tests {
+    #![allow(dead_code)]
     use super::*;
     use crate::plugin::installer::InstallStage;
     use proptest::prelude::*;
@@ -375,7 +376,7 @@ mod property_tests {
             "[a-z][a-z0-9_-]{0,99}",                 // repo
             "v[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}", // tag
         )
-            .prop_map(|(owner, repo, tag)| {
+            .prop_map(|(owner, repo, _tag)| {
                 format!("{}/@{}", owner, repo)
                     .replace("/@", &format!("/{}@", repo.chars().next().unwrap_or('r')))
             })

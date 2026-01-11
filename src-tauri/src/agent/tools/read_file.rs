@@ -652,7 +652,7 @@ mod tests {
         assert!(end <= 100);
 
         // 指定起始行
-        let (start, end) = calculate_line_range(100, Some(50), None);
+        let (start, _end) = calculate_line_range(100, Some(50), None);
         assert_eq!(start, 50);
 
         // 指定结束行
@@ -723,6 +723,7 @@ mod tests {
 
 #[cfg(test)]
 mod proptests {
+    #![allow(dead_code)]
     use super::*;
     use proptest::prelude::*;
     use std::fs;

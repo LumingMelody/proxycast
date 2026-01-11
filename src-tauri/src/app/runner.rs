@@ -3,7 +3,7 @@
 //! 包含 Tauri 应用的主入口函数和命令注册。
 
 use std::sync::Arc;
-use tauri::{Emitter, Listener, Manager};
+use tauri::Manager;
 
 use crate::commands;
 use crate::tray::{TrayIconStatus, TrayManager, TrayStateSnapshot};

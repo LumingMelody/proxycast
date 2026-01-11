@@ -5,7 +5,7 @@
 use mouse_position::mouse_position::Mouse;
 use std::path::Path;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[cfg(target_os = "macos")]
 use cocoa::appkit::{NSColor, NSWindow};
@@ -202,17 +202,18 @@ pub fn open_floating_window(app: &AppHandle, image_path: &Path) -> Result<(), Wi
     let (x, y) = calculate_window_position(app);
 
     // 创建悬浮窗口（启用透明）
-    let window = WebviewWindowBuilder::new(app, FLOATING_WINDOW_LABEL, WebviewUrl::App(url.into()))
-        .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
-        .position(x, y)
-        .decorations(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .visible(true)
-        .focused(true)
-        .transparent(true)
-        .build()
-        .map_err(|e| WindowError::CreateFailed(format!("{}", e)))?;
+    let _window =
+        WebviewWindowBuilder::new(app, FLOATING_WINDOW_LABEL, WebviewUrl::App(url.into()))
+            .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+            .position(x, y)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .visible(true)
+            .focused(true)
+            .transparent(true)
+            .build()
+            .map_err(|e| WindowError::CreateFailed(format!("{}", e)))?;
 
     // macOS: 设置窗口和 webview 背景透明
     #[cfg(target_os = "macos")]

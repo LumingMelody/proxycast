@@ -1311,6 +1311,7 @@ mod error_recovery_tests {
 
 #[cfg(test)]
 mod property_tests {
+    #![allow(dead_code)]
     use super::*;
     use proptest::prelude::*;
 

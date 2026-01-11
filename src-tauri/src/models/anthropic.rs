@@ -76,6 +76,7 @@ pub struct AnthropicUsage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct AnthropicMessagesResponse {
     pub id: String,
     #[serde(rename = "type")]

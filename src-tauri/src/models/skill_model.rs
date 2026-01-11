@@ -130,11 +130,11 @@ mod tests {
         assert!(first_repo.enabled, "ProxyCast 官方仓库应默认启用");
     }
 
-    /// Property 1: Default Repositories Include ProxyCast Official (Property-Based Test)
-    /// For any call to get_default_skill_repos(), the returned list SHALL contain
-    /// a SkillRepo with owner="proxycast", name="skills", branch="main", and enabled=true,
-    /// and this repo SHALL be the first item in the list.
-    /// Validates: Requirements 1.1, 1.2, 1.3
+    // Property 1: Default Repositories Include ProxyCast Official (Property-Based Test)
+    // For any call to get_default_skill_repos(), the returned list SHALL contain
+    // a SkillRepo with owner="proxycast", name="skills", branch="main", and enabled=true,
+    // and this repo SHALL be the first item in the list.
+    // Validates: Requirements 1.1, 1.2, 1.3
     proptest! {
         #[test]
         fn prop_default_repos_proxycast_first(_seed in 0u64..1000) {

@@ -2934,7 +2934,7 @@ pub struct PlaywrightStatus {
 
 /// 获取系统 Chrome 可执行文件路径
 fn get_system_chrome_path() -> Option<String> {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let _home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
 
     #[cfg(target_os = "macos")]
     {

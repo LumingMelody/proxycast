@@ -66,6 +66,7 @@ pub struct AuthTypeInfoResponse {
 /// 模型家族信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct ModelFamilyResponse {
     pub name: String,
     pub pattern: String,

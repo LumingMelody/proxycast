@@ -609,8 +609,8 @@ mod tests {
 mod property_tests {
     use super::*;
     use crate::flow_monitor::{
-        FlowAnnotations, FlowMetadata, FlowState, FlowTimestamps, FlowType, Message,
-        MessageContent, MessageRole, RequestParameters, RoutingInfo,
+        FlowAnnotations, FlowMetadata, FlowState, FlowTimestamps, FlowType, RequestParameters,
+        RoutingInfo,
     };
     use crate::ProviderType;
     use chrono::Utc;

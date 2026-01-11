@@ -74,7 +74,7 @@ impl SseResponseTranslator for OpenAiResponseTranslator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stream::{ContentBlockType, StopReason};
+    use crate::stream::StopReason;
 
     #[test]
     fn test_translate_text_delta() {

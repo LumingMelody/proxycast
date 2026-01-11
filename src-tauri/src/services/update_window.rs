@@ -164,7 +164,7 @@ pub fn open_update_window(
 
     let (x, y) = calculate_window_position(app);
 
-    let window = WebviewWindowBuilder::new(app, UPDATE_WINDOW_LABEL, WebviewUrl::App(url.into()))
+    let _window = WebviewWindowBuilder::new(app, UPDATE_WINDOW_LABEL, WebviewUrl::App(url.into()))
         .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .position(x, y)
         .decorations(false)

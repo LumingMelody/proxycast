@@ -5,8 +5,8 @@
 use chrono::{Duration, Utc};
 use proptest::prelude::*;
 
-use crate::providers::codex::{CodexCredentials, CodexProvider};
-use crate::providers::iflow::{IFlowCredentials, IFlowProvider};
+use crate::providers::codex::CodexProvider;
+use crate::providers::iflow::IFlowProvider;
 use crate::providers::vertex::VertexProvider;
 
 /// Generate a random lead time in minutes (1 to 30 minutes)
@@ -22,6 +22,7 @@ fn arb_time_offset_secs() -> impl Strategy<Value = i64> {
 
 /// 生成不会与 lead_time 边界冲突的时间偏移
 /// 避免 time_offset_secs 恰好等于 lead_time_mins * 60 的情况
+#[allow(dead_code)]
 fn arb_time_offset_avoiding_boundary(lead_time_mins: i64) -> impl Strategy<Value = i64> {
     let boundary = lead_time_mins * 60;
     // 生成不等于边界值的时间偏移
@@ -477,6 +478,7 @@ fn arb_model_name() -> impl Strategy<Value = String> {
 }
 
 /// Generate a random exclusion pattern
+#[allow(dead_code)]
 fn arb_exclusion_pattern() -> impl Strategy<Value = String> {
     prop_oneof![
         // Exact model names
@@ -491,6 +493,7 @@ fn arb_exclusion_pattern() -> impl Strategy<Value = String> {
 }
 
 /// Generate a list of exclusion patterns
+#[allow(dead_code)]
 fn arb_exclusion_patterns() -> impl Strategy<Value = Vec<String>> {
     proptest::collection::vec(arb_exclusion_pattern(), 0..5)
 }
