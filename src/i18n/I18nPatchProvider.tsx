@@ -20,7 +20,7 @@ import {
 import { replaceTextInDOM } from "./dom-replacer";
 import { Language, isValidLanguage } from "./text-map";
 
-interface I18nPatchContextValue {
+export interface I18nPatchContextValue {
   language: Language;
   setLanguage: (lang: Language) => void;
 }
@@ -42,7 +42,7 @@ export const useI18nPatch = () => {
   return context;
 };
 
-interface I18nPatchProviderProps {
+export interface I18nPatchProviderProps {
   children: ReactNode;
   initialLanguage?: Language;
 }

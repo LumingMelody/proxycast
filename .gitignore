@@ -51,3 +51,4 @@ src-tauri/gen
 # lwmacct preference
 .task
 Taskfile.yml
+nul

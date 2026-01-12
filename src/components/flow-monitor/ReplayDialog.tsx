@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LLMFlow, Message } from "@/lib/api/flowMonitor";
+import { t, formatDuration } from "@/i18n";
 
 // ============================================================================
 // 类型定义
@@ -562,7 +563,7 @@ function ReplayResultDisplay({
           </div>
           <div className="mt-3 pt-3 border-t text-center text-sm text-muted-foreground">
             <Clock className="h-4 w-4 inline mr-1" />
-            总耗时: {(batchResult.total_duration_ms / 1000).toFixed(2)}s
+            {t("total_duration", { duration: ((batchResult.total_duration_ms / 1000).toFixed(2)) + "s" })}
           </div>
         </div>
 
@@ -603,21 +604,21 @@ function ReplayResultDisplay({
             singleResult.success ? "text-green-600" : "text-red-600",
           )}
         >
-          {singleResult.success ? "重放成功" : "重放失败"}
+          {singleResult.success ? t("success_with_message", { action: "重放" }) : t("error_with_message", { action: "重放" })}
         </span>
       </div>
 
       {singleResult.success && singleResult.replay_flow_id && (
         <div className="mt-3 space-y-2">
           <div className="text-sm">
-            <span className="text-muted-foreground">新 Flow ID: </span>
+            <span className="text-muted-foreground">{t("new_flow_id", { id: "" })} </span>
             <span className="font-mono text-xs">
               {singleResult.replay_flow_id.slice(0, 16)}...
             </span>
           </div>
           <div className="text-sm text-muted-foreground">
             <Clock className="h-4 w-4 inline mr-1" />
-            耗时: {singleResult.duration_ms}ms
+            {t("duration", { duration: formatDuration(singleResult.duration_ms) })}
           </div>
           {onNavigateToFlow && (
             <button
