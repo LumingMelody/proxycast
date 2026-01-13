@@ -63,6 +63,48 @@ function sortModels(models: EnhancedModelMetadata[]): EnhancedModelMetadata[] {
 }
 
 /**
+ * 将自定义模型列表转换为 EnhancedModelMetadata 格式
+ */
+function convertCustomModelsToMetadata(
+  models: string[],
+  providerId: string,
+  providerName: string,
+): EnhancedModelMetadata[] {
+  return models.map((modelName): EnhancedModelMetadata => {
+    return {
+      id: modelName,
+      display_name: modelName,
+      provider_id: providerId,
+      provider_name: providerName,
+      family: null,
+      tier: "pro" as const,
+      capabilities: {
+        vision: false,
+        tools: true,
+        streaming: true,
+        json_mode: true,
+        function_calling: true,
+        reasoning: modelName.includes("thinking"),
+      },
+      pricing: null,
+      limits: {
+        context_length: null,
+        max_output_tokens: null,
+        requests_per_minute: null,
+        tokens_per_minute: null,
+      },
+      status: "active" as const,
+      release_date: null,
+      is_latest: false,
+      description: `自定义模型: ${modelName}`,
+      source: "custom" as const,
+      created_at: Date.now() / 1000,
+      updated_at: Date.now() / 1000,
+    };
+  });
+}
+
+/**
  * 将别名配置中的模型转换为 EnhancedModelMetadata 格式
  */
 function convertAliasModelsToMetadata(
@@ -155,42 +197,69 @@ export function useProviderModels(
       return { modelIds: [], models: [] };
     }
 
-    // 对于别名 Provider，使用别名配置中的模型列表
-    if (isAliasProvider(selectedProvider.key) && aliasConfig) {
-      const modelIds = aliasConfig.models;
+    // 收集所有模型
+    let allModels: EnhancedModelMetadata[] = [];
+    let allModelIds: string[] = [];
 
-      if (returnFullMetadata) {
-        const models = convertAliasModelsToMetadata(
-          modelIds,
-          aliasConfig,
-          selectedProvider.key,
-          selectedProvider.label,
-        );
-        return { modelIds, models };
-      }
-
-      return { modelIds, models: [] };
+    // 1. 首先添加自定义模型（排在最前面）
+    if (
+      selectedProvider.customModels &&
+      selectedProvider.customModels.length > 0
+    ) {
+      const customModels = convertCustomModelsToMetadata(
+        selectedProvider.customModels,
+        selectedProvider.key,
+        selectedProvider.label,
+      );
+      allModels = [...customModels];
+      allModelIds = [...selectedProvider.customModels];
     }
 
-    // 从模型注册表获取模型
-    let models = registryModels.filter(
+    // 2. 对于别名 Provider，添加别名配置中的模型
+    if (isAliasProvider(selectedProvider.key) && aliasConfig) {
+      const aliasModels = convertAliasModelsToMetadata(
+        aliasConfig.models,
+        aliasConfig,
+        selectedProvider.key,
+        selectedProvider.label,
+      );
+      // 过滤掉已存在的模型（避免重复）
+      const newAliasModels = aliasModels.filter(
+        (m) => !allModelIds.includes(m.id),
+      );
+      allModels = [...allModels, ...newAliasModels];
+      allModelIds = [...allModelIds, ...newAliasModels.map((m) => m.id)];
+    }
+
+    // 3. 从模型注册表获取模型
+    let registryFilteredModels = registryModels.filter(
       (m) => m.provider_id === selectedProvider.registryId,
     );
 
     // 如果没有找到模型，尝试使用 fallbackRegistryId
-    if (models.length === 0 && selectedProvider.fallbackRegistryId) {
-      models = registryModels.filter(
+    if (
+      registryFilteredModels.length === 0 &&
+      selectedProvider.fallbackRegistryId
+    ) {
+      registryFilteredModels = registryModels.filter(
         (m) => m.provider_id === selectedProvider.fallbackRegistryId,
       );
     }
 
-    // 排序
-    const sortedModels = sortModels(models);
-    const modelIds = sortedModels.map((m) => m.id);
+    // 过滤掉已存在的模型（避免重复）
+    const newRegistryModels = registryFilteredModels.filter(
+      (m) => !allModelIds.includes(m.id),
+    );
+
+    // 排序注册表模型
+    const sortedRegistryModels = sortModels(newRegistryModels);
+
+    allModels = [...allModels, ...sortedRegistryModels];
+    allModelIds = [...allModelIds, ...sortedRegistryModels.map((m) => m.id)];
 
     return {
-      modelIds,
-      models: returnFullMetadata ? sortedModels : [],
+      modelIds: allModelIds,
+      models: returnFullMetadata ? allModels : [],
     };
   }, [selectedProvider, registryModels, aliasConfig, returnFullMetadata]);
 

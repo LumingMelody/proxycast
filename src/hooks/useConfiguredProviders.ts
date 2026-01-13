@@ -34,6 +34,8 @@ export interface ConfiguredProvider {
   credentialType?: string;
   /** Provider ID（用于 API Key Provider） */
   providerId?: string;
+  /** 自定义模型列表（用于 API Key Provider） */
+  customModels?: string[];
 }
 
 export interface UseConfiguredProvidersResult {
@@ -127,6 +129,7 @@ export function useConfiguredProviders(): UseConfiguredProvidersResult {
             type: provider.type,
             credentialType: `${provider.type}_key`,
             providerId: provider.id,
+            customModels: provider.custom_models,
           });
         }
       });

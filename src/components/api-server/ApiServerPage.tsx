@@ -108,38 +108,6 @@ const ALIAS_CONFIG_MAPPING: Record<string, string> = {
   gemini_api_key: "gemini",
 };
 
-// 根据 API 类型获取对应的模型 provider_id 列表
-const getModelProviderIds = (apiType: ApiType, provider?: string): string[] => {
-  // Antigravity 使用自己的模型列表（别名配置）
-  if (provider?.toLowerCase() === "antigravity") {
-    return ["antigravity"];
-  }
-
-  // Codex 使用自己的模型列表（别名配置）
-  if (provider?.toLowerCase() === "codex") {
-    return ["codex"];
-  }
-
-  // Gemini 使用别名配置
-  if (
-    provider?.toLowerCase() === "gemini" ||
-    provider?.toLowerCase() === "gemini_api_key"
-  ) {
-    return ["gemini"];
-  }
-
-  switch (apiType) {
-    case "gemini":
-      return ["gemini"]; // 使用别名配置
-    case "anthropic":
-      return ["anthropic"];
-    case "openai":
-      return ["openai", "azure", "deepseek", "alibaba"];
-    default:
-      return [];
-  }
-};
-
 // 可用的 Provider 信息（合并 OAuth 凭证池和 API Key Provider）
 interface AvailableProvider {
   id: string;
@@ -308,31 +276,95 @@ export function ApiServerPage() {
         } else {
           // 非别名 Provider，使用模型注册表
           // 首先检查是否是自定义 API Key Provider
-          // 如果是，使用其 type 字段来确定 API 类型
-          let effectiveProvider = provider;
+          // 如果是，优先使用其 custom_models 字段
+          let customModels: string[] | undefined;
+          let registryId = provider; // 默认使用 provider ID 作为 registryId
+          let fallbackRegistryId: string | undefined;
+
           if (providers) {
             const customProvider = providers.find((p) => p.id === provider);
             if (customProvider) {
-              // 使用自定义 Provider 的 type 字段
-              effectiveProvider = customProvider.type;
+              // 获取自定义模型列表
+              customModels = customProvider.custom_models;
+              // 使用 provider.id 作为 registryId（适用于系统预设的 Provider，如 deepseek, moonshot）
+              // 如果模型注册表中没有该 id 的模型，则回退到使用 type 映射
+              registryId = customProvider.id;
+              // 根据 type 获取回退的 registryId
+              const typeToRegistryMap: Record<string, string> = {
+                openai: "openai",
+                anthropic: "anthropic",
+                "anthropic-compatible": "anthropic",
+                gemini: "gemini",
+                "azure-openai": "openai",
+                vertexai: "google",
+                ollama: "ollama",
+              };
+              fallbackRegistryId =
+                typeToRegistryMap[customProvider.type.toLowerCase()] ||
+                customProvider.type.toLowerCase();
             }
           }
 
-          // 根据 Provider 的 API 类型过滤模型
-          const apiType = getProviderApiType(effectiveProvider);
-          const providerIds = getModelProviderIds(apiType, provider);
+          // 收集所有模型
+          let allModels: EnhancedModelMetadata[] = [];
+          const existingIds = new Set<string>();
 
-          if (providerIds.length > 0) {
-            // 获取所有匹配 provider_id 的模型
-            const modelPromises = providerIds.map((id) =>
-              getModelsForProvider(id),
+          // 1. 首先添加自定义模型（排在最前面）
+          if (customModels && customModels.length > 0) {
+            const customModelList = customModels.map(
+              (modelName): EnhancedModelMetadata => ({
+                id: modelName,
+                display_name: modelName,
+                provider_id: provider,
+                provider_name: provider,
+                family: null,
+                tier: "pro" as const,
+                capabilities: {
+                  vision: false,
+                  tools: true,
+                  streaming: true,
+                  json_mode: true,
+                  function_calling: true,
+                  reasoning: modelName.includes("thinking"),
+                },
+                pricing: null,
+                limits: {
+                  context_length: null,
+                  max_output_tokens: null,
+                  requests_per_minute: null,
+                  tokens_per_minute: null,
+                },
+                status: "active" as const,
+                release_date: null,
+                is_latest: false,
+                description: `自定义模型: ${modelName}`,
+                source: "custom" as const,
+                created_at: Date.now() / 1000,
+                updated_at: Date.now() / 1000,
+              }),
             );
-            const modelArrays = await Promise.all(modelPromises);
-            models = modelArrays.flat();
-          } else {
-            // 未知类型，显示所有模型
-            models = await getModelRegistry();
+            allModels = [...customModelList];
+            customModels.forEach((id) => existingIds.add(id));
           }
+
+          // 2. 添加模型注册表中的模型
+          // 优先使用 registryId，如果没有模型则回退到 fallbackRegistryId
+          let registryModels = await getModelsForProvider(registryId);
+          if (
+            registryModels.length === 0 &&
+            fallbackRegistryId &&
+            fallbackRegistryId !== registryId
+          ) {
+            registryModels = await getModelsForProvider(fallbackRegistryId);
+          }
+
+          // 过滤掉已存在的模型
+          const newModels = registryModels.filter(
+            (m) => !existingIds.has(m.id),
+          );
+          allModels = [...allModels, ...newModels];
+
+          models = allModels;
         }
       } else {
         models = await getModelRegistry();
