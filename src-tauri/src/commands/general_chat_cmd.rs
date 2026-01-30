@@ -15,8 +15,7 @@
 use crate::database::dao::general_chat::GeneralChatDao;
 use crate::database::DbConnection;
 use crate::services::general_chat::{
-    ChatMessage, ChatSession, ContentBlock, CreateMessageRequest, CreateSessionRequest,
-    MessageRole, SessionDetail,
+    ChatMessage, ChatSession, ContentBlock, MessageRole, SessionDetail,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;

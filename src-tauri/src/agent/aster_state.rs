@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::agent::credential_bridge::{
-    create_aster_provider, AsterProviderConfig, CredentialBridge, CredentialBridgeError,
+    create_aster_provider, AsterProviderConfig, CredentialBridge,
 };
 use crate::database::DbConnection;
 

@@ -59,8 +59,8 @@ use crate::models::anthropic::AnthropicMessagesRequest;
 use crate::models::openai::ChatCompletionRequest;
 use crate::models::provider_pool_model::{CredentialData, ProviderCredential};
 use crate::providers::{
-    AntigravityApiError, AntigravityProvider, ClaudeCustomProvider, CodexProvider, KiroProvider,
-    OpenAICustomProvider, VertexProvider,
+    AntigravityProvider, ClaudeCustomProvider, CodexProvider, KiroProvider, OpenAICustomProvider,
+    VertexProvider,
 };
 use crate::server::AppState;
 use crate::server_utils::{
@@ -69,7 +69,6 @@ use crate::server_utils::{
 };
 use crate::session::store_thought_signature;
 use crate::stream::{PipelineConfig, StreamPipeline};
-use crate::streaming::traits::StreamingProvider;
 use crate::streaming::{
     StreamConfig, StreamContext, StreamError, StreamFormat as StreamingFormat, StreamManager,
     StreamResponse,

@@ -530,6 +530,36 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
+    // ============================================================================
+    // Workspace 相关表
+    // ============================================================================
+
+    // Workspace 表
+    // 存储 Workspace 元数据，用于组织和管理 AI Agent 的工作上下文
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS workspaces (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            workspace_type TEXT NOT NULL DEFAULT 'persistent',
+            root_path TEXT NOT NULL UNIQUE,
+            is_default INTEGER DEFAULT 0,
+            settings_json TEXT DEFAULT '{}',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )",
+        [],
+    )?;
+
+    // 创建 workspaces 索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_workspaces_root_path ON workspaces(root_path)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_workspaces_is_default ON workspaces(is_default)",
+        [],
+    )?;
+
     Ok(())
 }
 

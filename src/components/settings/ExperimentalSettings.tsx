@@ -18,6 +18,12 @@ import {
 } from "@/hooks/useTauri";
 import { ShortcutSettings } from "@/components/screenshot-chat/ShortcutSettings";
 import { UpdateCheckSettings } from "./UpdateNotification";
+import { VoiceSettings } from "@/components/voice";
+import {
+  getVoiceInputConfig,
+  saveVoiceInputConfig,
+  VoiceInputConfig,
+} from "@/lib/api/asrProvider";
 
 // ============================================================
 // 组件
@@ -26,6 +32,7 @@ import { UpdateCheckSettings } from "./UpdateNotification";
 export function ExperimentalSettings() {
   // 状态
   const [config, setConfig] = useState<ExperimentalFeatures | null>(null);
+  const [voiceConfig, setVoiceConfig] = useState<VoiceInputConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +49,12 @@ export function ExperimentalSettings() {
     setLoading(true);
     setError(null);
     try {
-      const experimentalConfig = await getExperimentalConfig();
+      const [experimentalConfig, voiceInputConfig] = await Promise.all([
+        getExperimentalConfig(),
+        getVoiceInputConfig(),
+      ]);
       setConfig(experimentalConfig);
+      setVoiceConfig(voiceInputConfig);
     } catch (err) {
       console.error("加载实验室配置失败:", err);
       setError(err instanceof Error ? err.message : "加载配置失败");
@@ -53,6 +64,19 @@ export function ExperimentalSettings() {
           enabled: false,
           shortcut: "CommandOrControl+Alt+Q",
         },
+      });
+      setVoiceConfig({
+        enabled: false,
+        shortcut: "CommandOrControl+Shift+V",
+        processor: {
+          polish_enabled: true,
+          default_instruction_id: "default",
+        },
+        output: {
+          mode: "type",
+          type_delay_ms: 10,
+        },
+        instructions: [],
       });
     } finally {
       setLoading(false);
@@ -126,6 +150,32 @@ export function ExperimentalSettings() {
       return false;
     }
   }, []);
+
+  // 更新语音输入配置
+  const handleVoiceConfigChange = useCallback(
+    async (newConfig: VoiceInputConfig) => {
+      setSaving(true);
+      setMessage(null);
+      try {
+        await saveVoiceInputConfig(newConfig);
+        setVoiceConfig(newConfig);
+        setMessage({
+          type: "success",
+          text: newConfig.enabled ? "语音输入功能已启用" : "语音输入功能已禁用",
+        });
+        setTimeout(() => setMessage(null), 2000);
+      } catch (err) {
+        console.error("保存语音配置失败:", err);
+        setMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "保存失败",
+        });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [],
+  );
 
   // 加载中状态
   if (loading) {
@@ -262,6 +312,18 @@ export function ExperimentalSettings() {
       <div className="rounded-lg border p-4">
         <UpdateCheckSettings />
       </div>
+
+      {/* 语音输入功能 */}
+      {voiceConfig && (
+        <div className="rounded-lg border p-4">
+          <VoiceSettings
+            config={voiceConfig}
+            onConfigChange={handleVoiceConfigChange}
+            onValidateShortcut={handleValidateShortcut}
+            disabled={saving}
+          />
+        </div>
+      )}
 
       {/* 更多实验功能占位 */}
       <div className="rounded-lg border border-dashed p-4 text-center">

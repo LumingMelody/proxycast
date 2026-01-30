@@ -34,6 +34,7 @@ AI Agent 专用文档目录，提供模块级别的详细说明。
 
 ### Aster 集成
 - `aster-integration.md` - **Aster 框架集成方案**
+- `workspace.md` - **Workspace 设计文档**（工作目录管理）
 
 ## 使用方式
 
@@ -48,6 +49,9 @@ AI Agent 在处理特定模块时，应先阅读对应的 aiprompts 文档：
 
 # 处理 Aster Agent 集成
 → 先读 docs/aiprompts/aster-integration.md
+
+# 处理 Workspace 相关任务
+→ 先读 docs/aiprompts/workspace.md
 ```
 
 ## 更新提醒

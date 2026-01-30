@@ -374,9 +374,9 @@ impl HotReloadManager {
 
     /// 验证配置
     fn validate_config(&self, config: &Config) -> Result<(), HotReloadError> {
-        let is_localhost = is_localhost_host(&config.server.host);
+        let _is_localhost = is_localhost_host(&config.server.host);
         let is_valid_host = is_valid_bind_host(&config.server.host);
-        let is_non_local = is_non_local_bind(&config.server.host);
+        let _is_non_local = is_non_local_bind(&config.server.host);
 
         // 验证端口范围
         if config.server.port == 0 {

@@ -219,8 +219,8 @@ impl CredentialBridge {
     async fn get_kiro_token(
         &self,
         creds_path: &str,
-        db: &DbConnection,
-        uuid: &str,
+        _db: &DbConnection,
+        _uuid: &str,
     ) -> Result<String, CredentialBridgeError> {
         use crate::providers::kiro::KiroProvider;
 

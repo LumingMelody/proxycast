@@ -32,6 +32,7 @@ React 组件层，包含 UI 组件和业务组件。
 - `widgets/` - 右侧小部件栏组件（移植自 Waveterm）
 - `ui/` - 通用 UI 组件（按钮、输入框等）
 - `websocket/` - WebSocket 管理组件
+- `workspace/` - Workspace 工作目录管理组件
 - `AppSidebar.tsx` - 全局图标侧边栏（类似 cherry-studio）
 - `ConfirmDialog.tsx` - 确认对话框
 - `HelpTip.tsx` - 帮助提示组件

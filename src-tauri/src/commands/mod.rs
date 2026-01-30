@@ -1,5 +1,6 @@
 pub mod agent_cmd;
 pub mod api_key_provider_cmd;
+pub mod asr_cmd;
 pub mod aster_agent_cmd;
 pub mod auto_fix_cmd;
 pub mod browser_interceptor_cmd;
@@ -40,3 +41,4 @@ pub mod usage_cmd;
 pub mod websocket_cmd;
 pub mod webview_cmd;
 pub mod window_cmd;
+pub mod workspace_cmd;

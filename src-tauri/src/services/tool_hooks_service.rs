@@ -6,7 +6,7 @@ use crate::services::context_memory_service::{ContextMemoryService, MemoryEntry,
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// 钩子触发时机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

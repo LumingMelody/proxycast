@@ -35,6 +35,11 @@
           "name": "binaries/aster-server",
           "sidecar": true,
           "args": true
+        },
+        {
+          "name": "open",
+          "cmd": "open",
+          "args": true
         }
       ]
     },

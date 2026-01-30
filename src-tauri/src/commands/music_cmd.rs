@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::State;
 
 /// MIDI 分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]

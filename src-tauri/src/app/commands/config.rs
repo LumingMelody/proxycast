@@ -3,11 +3,11 @@
 //! 包含配置读取、保存、Provider 设置等命令。
 
 use crate::app::types::{AppState, LogState};
-use crate::app::utils::{is_non_local_bind, is_valid_bind_host};
+use crate::app::utils::is_valid_bind_host;
 use crate::config::{
     self,
     observer::{ConfigChangeEvent, RoutingChangeEvent},
-    ConfigChangeSource, GlobalConfigManagerState, DEFAULT_API_KEY,
+    ConfigChangeSource, GlobalConfigManagerState,
 };
 
 /// 获取配置

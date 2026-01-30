@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.48.4"
+version = "0.49.0"
 edition = "2021"
 authors = ["you"]
 repository = "https://github.com/aiclientproxy/proxycast"
@@ -13,6 +13,7 @@ homepage = "https://github.com/aiclientproxy/proxycast"
 # 项目内 crate 依赖
 proxycast-core = { path = "crates/core" }
 proxycast-infra = { path = "crates/infra" }
+voice-core = { path = "crates/voice-core" }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -80,6 +81,9 @@ scopeguard = "1"
 sysinfo = "0.32"
 whoami = "1"
 
+# 音频
+cpal = "0.15"
+
 # TLS
 rustls-pemfile = "2"
 
@@ -94,6 +98,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 mouse_position = "0.1.4"
 window-vibrancy = "0.7.1"
 if-addrs = "0.13"
+enigo = "0.3"
 
 # Aster Agent Framework
 # 开发时使用本地 aster-rust，CI/CD 使用远程 GitHub 仓库
@@ -159,7 +164,7 @@ version = "2.4"
 
 [package]
 name = "proxycast"
-version = "0.48.1"
+version = "0.49.0"
 description = "AI API Proxy Desktop App"
 authors = ["you"]
 edition = "2021"
@@ -177,6 +182,7 @@ tauri-build.workspace = true
 # 项目内 crate
 proxycast-core.workspace = true
 proxycast-infra.workspace = true
+voice-core.workspace = true
 
 # Tauri
 tauri.workspace = true
@@ -264,6 +270,10 @@ openssl.workspace = true
 mouse_position.workspace = true
 window-vibrancy.workspace = true
 if-addrs.workspace = true
+enigo.workspace = true
+
+# 音频
+cpal.workspace = true
 
 # Aster Agent Framework
 aster.workspace = true

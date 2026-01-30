@@ -294,6 +294,161 @@ pub fn focus_floating_window(app: &AppHandle) -> Result<(), WindowError> {
     }
 }
 
+/// 打开带预填文本的悬浮输入框
+///
+/// 用于语音识别完成后，将识别结果填入输入框
+///
+/// # 参数
+/// - `app`: Tauri 应用句柄
+/// - `text`: 预填文本
+///
+/// # 返回
+/// 成功返回 Ok(()), 失败返回错误
+pub fn open_floating_window_with_text(app: &AppHandle, text: &str) -> Result<(), WindowError> {
+    info!("打开带预填文本的悬浮输入框");
+
+    // 构建窗口 URL，包含文本参数
+    let encoded_text = urlencoding::encode(text);
+    let url = format!("/screenshot-chat?text={}", encoded_text);
+
+    open_floating_window_with_url(app, &url)
+}
+
+/// 打开语音模式的悬浮输入框
+///
+/// 自动开始录音，录音完成后填入文本
+///
+/// # 参数
+/// - `app`: Tauri 应用句柄
+///
+/// # 返回
+/// 成功返回 Ok(()), 失败返回错误
+pub fn open_floating_window_voice_mode(app: &AppHandle) -> Result<(), WindowError> {
+    info!("打开语音模式的悬浮输入框");
+    let url = "/screenshot-chat?voice=true";
+    open_floating_window_with_url(app, url)
+}
+
+/// 内部函数：打开带指定 URL 的悬浮窗口
+fn open_floating_window_with_url(app: &AppHandle, url: &str) -> Result<(), WindowError> {
+    debug!("悬浮窗口 URL: {}", url);
+
+    // 检查是否是语音模式
+    let is_voice_mode = url.contains("voice=true");
+
+    // 检查窗口是否已存在
+    if let Some(window) = app.get_webview_window(FLOATING_WINDOW_LABEL) {
+        info!("悬浮窗口已存在，导航到新 URL 并显示");
+
+        // 计算窗口位置
+        let (x, y) = calculate_window_position(app);
+
+        // 设置窗口位置
+        use tauri::LogicalPosition;
+        let _ = window.set_position(LogicalPosition::new(x, y));
+
+        // macOS: 设置窗口背景透明
+        #[cfg(target_os = "macos")]
+        {
+            use objc::{msg_send, sel, sel_impl};
+            if let Ok(ns_win) = window.ns_window() {
+                #[allow(deprecated, unexpected_cfgs)]
+                unsafe {
+                    let ns_window = ns_win as id;
+                    let clear_color = NSColor::clearColor(nil);
+                    ns_window.setBackgroundColor_(clear_color);
+                    let _: () = msg_send![ns_window, setOpaque: false];
+                    let _: () = msg_send![ns_window, setHasShadow: false];
+                }
+            }
+        }
+
+        // 导航到新 URL（强制刷新）
+        let js = format!("window.location.replace('{}');", url);
+        window
+            .eval(&js)
+            .map_err(|e| WindowError::OperationFailed(format!("导航失败: {}", e)))?;
+
+        window
+            .show()
+            .map_err(|e| WindowError::OperationFailed(format!("显示窗口失败: {}", e)))?;
+
+        window
+            .set_focus()
+            .map_err(|e| WindowError::OperationFailed(format!("聚焦窗口失败: {}", e)))?;
+
+        // 如果是语音模式，额外发送事件确保前端收到
+        if is_voice_mode {
+            use tauri::Emitter;
+            // 延迟发送事件，等待页面加载
+            let window_clone = window.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                let _ = window_clone.emit("voice-start-recording", ());
+                info!("[语音输入] 已发送开始录音事件");
+            });
+        }
+
+        return Ok(());
+    }
+
+    // 窗口不存在，动态创建
+    info!("动态创建悬浮窗口");
+
+    let (x, y) = calculate_window_position(app);
+
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+    let window = WebviewWindowBuilder::new(app, FLOATING_WINDOW_LABEL, WebviewUrl::App(url.into()))
+        .inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+        .position(x, y)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(true)
+        .focused(true)
+        .transparent(true)
+        .build()
+        .map_err(|e| WindowError::CreateFailed(format!("{}", e)))?;
+
+    // macOS: 设置窗口背景透明
+    #[cfg(target_os = "macos")]
+    {
+        use objc::{msg_send, sel, sel_impl};
+        if let Ok(ns_win) = window.ns_window() {
+            #[allow(deprecated, unexpected_cfgs)]
+            unsafe {
+                let ns_window = ns_win as id;
+                let clear_color = NSColor::clearColor(nil);
+                ns_window.setBackgroundColor_(clear_color);
+                let _: () = msg_send![ns_window, setOpaque: false];
+                let _: () = msg_send![ns_window, setHasShadow: false];
+            }
+        }
+    }
+
+    info!("悬浮窗口创建成功: {}", FLOATING_WINDOW_LABEL);
+
+    Ok(())
+}
+
+/// 打开语音模式的悬浮输入框（别名，供语音模块调用）
+pub fn open_floating_window_with_voice(app: &AppHandle) -> Result<(), WindowError> {
+    open_floating_window_voice_mode(app)
+}
+
+/// 发送语音停止录音事件到截图输入框
+pub fn send_voice_stop_event(app: &AppHandle) -> Result<(), WindowError> {
+    use tauri::Emitter;
+
+    if let Some(window) = app.get_webview_window(FLOATING_WINDOW_LABEL) {
+        window
+            .emit("voice-stop-recording", ())
+            .map_err(|e| WindowError::OperationFailed(format!("发送停止录音事件失败: {}", e)))?;
+        info!("[语音输入] 已发送停止录音事件到截图输入框");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

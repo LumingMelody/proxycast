@@ -11,7 +11,7 @@
 //! - SQLite 数据库（通过 DatabaseService）
 //! - types 模块中的数据结构
 
-use super::types::{ChatMessage, ChatSession, ContentBlock, CreateMessageRequest, MessageRole};
+use super::types::{ChatMessage, ChatSession, ContentBlock, CreateMessageRequest};
 use chrono::Utc;
 use uuid::Uuid;
 

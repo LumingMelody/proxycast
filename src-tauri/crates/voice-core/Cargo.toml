@@ -1,0 +1,62 @@
+[package]
+name = "voice-core"
+version = "0.1.0"
+edition = "2021"
+description = "语音输入核心库 - 音频录制、语音识别、文字输出"
+authors = ["ProxyCast Team"]
+license = "MIT"
+
+[dependencies]
+# 音频录制
+cpal = "0.15"
+
+# Whisper 本地识别
+whisper-rs = "0.12"
+
+# WAV 处理
+hound = "3.5"
+
+# 键盘模拟
+enigo = { version = "0.2", features = ["serde"] }
+
+# 剪贴板
+arboard = "3.4"
+
+# HTTP 客户端（云端 ASR）
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+
+# 异步运行时
+tokio = { version = "1", features = ["sync", "time"] }
+
+# WebSocket 客户端（讯飞 ASR）
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 错误处理
+thiserror = "1"
+
+# 异步 trait
+async-trait = "0.1"
+
+# 日志
+tracing = "0.1"
+
+# Base64 编码（云端 ASR）
+base64 = "0.22"
+
+# HMAC 签名（讯飞 ASR）
+hmac = "0.12"
+sha2 = "0.10"
+
+# URL 编码
+urlencoding = "2"
+
+# 时间处理
+chrono = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

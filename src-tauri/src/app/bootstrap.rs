@@ -44,9 +44,10 @@ use crate::services::token_cache_service::TokenCacheService;
 use crate::services::tool_hooks_service::ToolHooksService;
 use crate::services::update_check_service::UpdateCheckServiceState;
 use crate::telemetry;
+use crate::voice::recording_service::{create_recording_service_state, RecordingServiceState};
 
 use super::types::{AppState, LogState, TokenCacheServiceState};
-use super::utils::{generate_api_key, is_non_local_bind, is_valid_bind_host};
+use super::utils::{generate_api_key, is_valid_bind_host};
 
 /// 配置验证错误
 #[derive(Debug)]
@@ -148,6 +149,7 @@ pub struct AppStates {
     pub session_files: SessionFilesState,
     pub context_memory_service: ContextMemoryServiceState,
     pub tool_hooks_service: ToolHooksServiceState,
+    pub recording_service: RecordingServiceState,
     // 用于 setup hook 的共享实例
     pub shared_stats: Arc<parking_lot::RwLock<telemetry::StatsAggregator>>,
     pub shared_tokens: Arc<parking_lot::RwLock<telemetry::TokenTracker>>,
@@ -265,6 +267,9 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
     let tool_hooks_service = ToolHooksService::new(context_memory_service_arc.clone());
     let tool_hooks_service_state = ToolHooksServiceState(Arc::new(tool_hooks_service));
 
+    // 录音服务（使用独立线程 + channel 通信解决 cpal::Stream 不是 Send 的问题）
+    let recording_service_state = create_recording_service_state();
+
     Ok(AppStates {
         state,
         logs,
@@ -300,6 +305,7 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
         session_files: session_files_state,
         context_memory_service: context_memory_service_state,
         tool_hooks_service: tool_hooks_service_state,
+        recording_service: recording_service_state,
         shared_stats,
         shared_tokens,
         shared_logger,

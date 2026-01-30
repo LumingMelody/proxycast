@@ -1,8 +1,7 @@
 //! 工具钩子管理相关的 Tauri 命令
 
 use crate::services::tool_hooks_service::{
-    HookAction, HookCondition, HookContext, HookExecutionStats, HookRule, HookTrigger,
-    ToolHooksService,
+    HookContext, HookExecutionStats, HookRule, HookTrigger, ToolHooksService,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

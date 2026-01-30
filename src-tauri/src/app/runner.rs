@@ -81,6 +81,7 @@ pub fn run() {
         session_files: session_files_state,
         context_memory_service,
         tool_hooks_service,
+        recording_service,
         shared_stats,
         shared_tokens,
         shared_logger,
@@ -164,6 +165,7 @@ pub fn run() {
         .manage(session_files_state)
         .manage(context_memory_service)
         .manage(tool_hooks_service)
+        .manage(recording_service)
         .on_window_event(move |window, event| {
             // 处理窗口关闭事件
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -236,6 +238,20 @@ pub fn run() {
                     Err(e) => {
                         tracing::error!("[启动] 截图对话模块初始化失败: {}", e);
                         // 截图模块初始化失败不影响应用运行
+                    }
+                }
+            }
+
+            // 初始化语音输入模块
+            {
+                let app_handle = app.handle();
+                match crate::voice::init(app_handle) {
+                    Ok(()) => {
+                        tracing::info!("[启动] 语音输入模块初始化成功");
+                    }
+                    Err(e) => {
+                        tracing::error!("[启动] 语音输入模块初始化失败: {}", e);
+                        // 语音模块初始化失败不影响应用运行
                     }
                 }
             }
@@ -1171,10 +1187,9 @@ pub fn run() {
             commands::screenshot_cmd::validate_shortcut,
             commands::screenshot_cmd::update_screenshot_shortcut,
             commands::screenshot_cmd::close_screenshot_chat_window,
+            commands::screenshot_cmd::open_input_with_text,
             commands::screenshot_cmd::read_image_as_base64,
             commands::screenshot_cmd::send_screenshot_chat,
-            commands::screenshot_cmd::close_screenshot_chat_window,
-            commands::screenshot_cmd::read_image_as_base64,
             // Update Check commands
             commands::update_cmd::check_update,
             commands::update_cmd::get_update_check_settings,
@@ -1213,6 +1228,15 @@ pub fn run() {
             commands::general_chat_cmd::general_chat_add_message,
             commands::general_chat_cmd::general_chat_send_message,
             commands::general_chat_cmd::general_chat_stop_generation,
+            // Workspace commands
+            commands::workspace_cmd::workspace_create,
+            commands::workspace_cmd::workspace_list,
+            commands::workspace_cmd::workspace_get,
+            commands::workspace_cmd::workspace_update,
+            commands::workspace_cmd::workspace_delete,
+            commands::workspace_cmd::workspace_set_default,
+            commands::workspace_cmd::workspace_get_default,
+            commands::workspace_cmd::workspace_get_by_path,
             // Context Memory commands
             commands::context_memory::save_memory_entry,
             commands::context_memory::get_session_memories,
@@ -1230,6 +1254,29 @@ pub fn run() {
             commands::tool_hooks::get_hook_rules,
             commands::tool_hooks::get_hook_execution_stats,
             commands::tool_hooks::clear_hook_execution_stats,
+            // ASR commands
+            commands::asr_cmd::get_asr_credentials,
+            commands::asr_cmd::add_asr_credential,
+            commands::asr_cmd::update_asr_credential,
+            commands::asr_cmd::delete_asr_credential,
+            commands::asr_cmd::set_default_asr_credential,
+            commands::asr_cmd::test_asr_credential,
+            // Voice Input commands
+            crate::voice::commands::get_voice_input_config,
+            crate::voice::commands::save_voice_input_config,
+            crate::voice::commands::get_voice_instructions,
+            crate::voice::commands::save_voice_instruction,
+            crate::voice::commands::delete_voice_instruction,
+            crate::voice::commands::open_voice_window,
+            crate::voice::commands::close_voice_window,
+            crate::voice::commands::transcribe_audio,
+            crate::voice::commands::polish_voice_text,
+            crate::voice::commands::output_voice_text,
+            // 录音命令（使用独立线程 + channel 通信）
+            crate::voice::commands::start_recording,
+            crate::voice::commands::stop_recording,
+            crate::voice::commands::cancel_recording,
+            crate::voice::commands::get_recording_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -38,6 +38,143 @@ pub struct CredentialPoolConfig {
     /// Codex OAuth 凭证列表
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub codex: Vec<CredentialEntry>,
+    /// ASR 语音服务凭证列表
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asr: Vec<AsrCredentialEntry>,
+}
+
+// ============ ASR 语音服务配置类型 ============
+
+/// ASR Provider 类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AsrProviderType {
+    /// 本地 Whisper（离线）
+    WhisperLocal,
+    /// 讯飞语音识别
+    Xunfei,
+    /// 百度语音识别
+    Baidu,
+    /// OpenAI Whisper API
+    OpenAI,
+}
+
+impl Default for AsrProviderType {
+    fn default() -> Self {
+        Self::WhisperLocal
+    }
+}
+
+/// Whisper 模型大小
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WhisperModelSize {
+    /// tiny - 最小，最快（~75MB）
+    Tiny,
+    /// base - 基础（~142MB）
+    Base,
+    /// small - 小型（~466MB）
+    Small,
+    /// medium - 中型（~1.5GB）
+    Medium,
+}
+
+impl Default for WhisperModelSize {
+    fn default() -> Self {
+        Self::Base
+    }
+}
+
+/// ASR 凭证条目
+///
+/// 用于语音识别服务的凭证管理
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AsrCredentialEntry {
+    /// 凭证 ID
+    pub id: String,
+    /// Provider 类型
+    pub provider: AsrProviderType,
+    /// 显示名称
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// 是否为默认凭证
+    #[serde(default)]
+    pub is_default: bool,
+    /// 是否禁用
+    #[serde(default)]
+    pub disabled: bool,
+    /// 识别语言（如 "zh", "en", "auto"）
+    #[serde(default = "default_asr_language")]
+    pub language: String,
+    /// Whisper 本地配置（仅 WhisperLocal）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whisper_config: Option<WhisperLocalConfig>,
+    /// 讯飞配置（仅 Xunfei）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xunfei_config: Option<XunfeiConfig>,
+    /// 百度配置（仅 Baidu）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baidu_config: Option<BaiduConfig>,
+    /// OpenAI 配置（仅 OpenAI）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openai_config: Option<OpenAIAsrConfig>,
+}
+
+fn default_asr_language() -> String {
+    "zh".to_string()
+}
+
+/// Whisper 本地配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WhisperLocalConfig {
+    /// 模型大小
+    #[serde(default)]
+    pub model: WhisperModelSize,
+    /// 模型文件路径（可选，默认自动下载）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_path: Option<String>,
+}
+
+impl Default for WhisperLocalConfig {
+    fn default() -> Self {
+        Self {
+            model: WhisperModelSize::default(),
+            model_path: None,
+        }
+    }
+}
+
+/// 讯飞语音配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct XunfeiConfig {
+    /// App ID
+    pub app_id: String,
+    /// API Key
+    pub api_key: String,
+    /// API Secret
+    pub api_secret: String,
+}
+
+/// 百度语音配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BaiduConfig {
+    /// API Key
+    pub api_key: String,
+    /// Secret Key
+    pub secret_key: String,
+}
+
+/// OpenAI ASR 配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OpenAIAsrConfig {
+    /// API Key
+    pub api_key: String,
+    /// 自定义 Base URL（可选）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// 代理 URL（可选）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
 }
 
 /// Gemini API Key 凭证条目
@@ -443,6 +580,201 @@ pub struct ExperimentalFeatures {
     /// 自动更新检查配置
     #[serde(default)]
     pub update_check: UpdateCheckConfig,
+    /// 语音输入功能配置
+    #[serde(default)]
+    pub voice_input: VoiceInputConfig,
+}
+
+// ============ 语音输入功能配置类型 ============
+
+/// 语音输入功能配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VoiceInputConfig {
+    /// 是否启用语音输入功能
+    #[serde(default)]
+    pub enabled: bool,
+    /// 触发语音输入的全局快捷键
+    #[serde(default = "default_voice_shortcut")]
+    pub shortcut: String,
+    /// 语音处理配置
+    #[serde(default)]
+    pub processor: VoiceProcessorConfig,
+    /// 输出配置
+    #[serde(default)]
+    pub output: VoiceOutputConfig,
+    /// 自定义指令列表
+    #[serde(default)]
+    pub instructions: Vec<VoiceInstruction>,
+}
+
+fn default_voice_shortcut() -> String {
+    "CommandOrControl+Shift+V".to_string()
+}
+
+impl Default for VoiceInputConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            shortcut: default_voice_shortcut(),
+            processor: VoiceProcessorConfig::default(),
+            output: VoiceOutputConfig::default(),
+            instructions: default_instructions(),
+        }
+    }
+}
+
+/// 语音处理配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VoiceProcessorConfig {
+    /// 是否启用 AI 润色
+    #[serde(default = "default_polish_enabled")]
+    pub polish_enabled: bool,
+    /// 润色使用的 LLM Provider（使用现有 Provider 系统）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polish_provider: Option<String>,
+    /// 润色使用的模型
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polish_model: Option<String>,
+    /// 默认指令 ID
+    #[serde(default = "default_instruction_id")]
+    pub default_instruction_id: String,
+}
+
+fn default_polish_enabled() -> bool {
+    true
+}
+
+fn default_instruction_id() -> String {
+    "default".to_string()
+}
+
+impl Default for VoiceProcessorConfig {
+    fn default() -> Self {
+        Self {
+            polish_enabled: default_polish_enabled(),
+            polish_provider: None,
+            polish_model: None,
+            default_instruction_id: default_instruction_id(),
+        }
+    }
+}
+
+/// 语音输出配置
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VoiceOutputConfig {
+    /// 输出模式
+    #[serde(default)]
+    pub mode: VoiceOutputMode,
+    /// 输入延迟（毫秒），用于模拟键盘输入
+    #[serde(default = "default_type_delay_ms")]
+    pub type_delay_ms: u32,
+}
+
+fn default_type_delay_ms() -> u32 {
+    10
+}
+
+impl Default for VoiceOutputConfig {
+    fn default() -> Self {
+        Self {
+            mode: VoiceOutputMode::default(),
+            type_delay_ms: default_type_delay_ms(),
+        }
+    }
+}
+
+/// 语音输出模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VoiceOutputMode {
+    /// 模拟键盘输入
+    Type,
+    /// 复制到剪贴板
+    Clipboard,
+    /// 两者都做
+    Both,
+}
+
+impl Default for VoiceOutputMode {
+    fn default() -> Self {
+        Self::Type
+    }
+}
+
+/// 语音处理指令
+///
+/// 定义不同的文本处理模式，如默认润色、翻译、邮件格式等
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VoiceInstruction {
+    /// 指令 ID
+    pub id: String,
+    /// 显示名称
+    pub name: String,
+    /// 指令描述
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Prompt 模板（使用 {{text}} 作为占位符）
+    pub prompt: String,
+    /// 快捷键（可选）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortcut: Option<String>,
+    /// 是否为系统预设（不可删除）
+    #[serde(default)]
+    pub is_preset: bool,
+    /// 图标（可选，用于 UI 显示）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+}
+
+/// 默认指令列表
+fn default_instructions() -> Vec<VoiceInstruction> {
+    vec![
+        VoiceInstruction {
+            id: "default".to_string(),
+            name: "默认润色".to_string(),
+            description: Some("去除语气词、添加标点、修正语法".to_string()),
+            prompt: "请对以下语音转文字内容进行润色，去除语气词（如「嗯」「啊」「那个」等），添加合适的标点符号，修正明显的语法错误，但保持原意不变。只输出润色后的文本，不要添加任何解释：\n\n{{text}}".to_string(),
+            shortcut: None,
+            is_preset: true,
+            icon: Some("sparkles".to_string()),
+        },
+        VoiceInstruction {
+            id: "translate_en".to_string(),
+            name: "翻译为英文".to_string(),
+            description: Some("将中文翻译为英文".to_string()),
+            prompt: "请将以下中文内容翻译为英文，保持专业、自然的表达。只输出翻译结果，不要添加任何解释：\n\n{{text}}".to_string(),
+            shortcut: None,
+            is_preset: true,
+            icon: Some("globe".to_string()),
+        },
+        VoiceInstruction {
+            id: "email".to_string(),
+            name: "邮件格式".to_string(),
+            description: Some("整理为正式邮件格式".to_string()),
+            prompt: "请将以下内容整理为正式的邮件格式，包含适当的问候语和结束语，语气专业礼貌。只输出邮件内容，不要添加任何解释：\n\n{{text}}".to_string(),
+            shortcut: None,
+            is_preset: true,
+            icon: Some("mail".to_string()),
+        },
+        VoiceInstruction {
+            id: "summary".to_string(),
+            name: "总结要点".to_string(),
+            description: Some("提取关键信息，生成简洁要点".to_string()),
+            prompt: "请总结以下内容的要点，用简洁的条目列出关键信息：\n\n{{text}}".to_string(),
+            shortcut: None,
+            is_preset: true,
+            icon: Some("list".to_string()),
+        },
+        VoiceInstruction {
+            id: "raw".to_string(),
+            name: "原始输出".to_string(),
+            description: Some("不做任何处理，直接输出识别结果".to_string()),
+            prompt: "{{text}}".to_string(),
+            shortcut: None,
+            is_preset: true,
+            icon: Some("type".to_string()),
+        },
+    ]
 }
 
 impl NativeAgentConfig {
@@ -1624,5 +1956,104 @@ mod unit_tests {
             config.experimental.screenshot_chat.shortcut,
             "CommandOrControl+Shift+S"
         );
+        // 语音输入测试
+        assert!(!config.experimental.voice_input.enabled);
+        assert_eq!(
+            config.experimental.voice_input.shortcut,
+            "CommandOrControl+Shift+V"
+        );
+    }
+
+    #[test]
+    fn test_asr_credential_entry_serialization() {
+        let entry = AsrCredentialEntry {
+            id: "whisper-local".to_string(),
+            provider: AsrProviderType::WhisperLocal,
+            name: Some("本地 Whisper".to_string()),
+            is_default: true,
+            disabled: false,
+            language: "zh".to_string(),
+            whisper_config: Some(WhisperLocalConfig {
+                model: WhisperModelSize::Base,
+                model_path: None,
+            }),
+            xunfei_config: None,
+            baidu_config: None,
+            openai_config: None,
+        };
+        let yaml = serde_yaml::to_string(&entry).unwrap();
+        assert!(yaml.contains("provider: whisper_local"));
+        assert!(yaml.contains("is_default: true"));
+
+        let parsed: AsrCredentialEntry = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(parsed, entry);
+    }
+
+    #[test]
+    fn test_voice_input_config_default() {
+        let config = VoiceInputConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.shortcut, "CommandOrControl+Shift+V");
+        assert!(config.processor.polish_enabled);
+        assert_eq!(config.processor.default_instruction_id, "default");
+        assert_eq!(config.output.mode, VoiceOutputMode::Type);
+        assert!(!config.instructions.is_empty());
+    }
+
+    #[test]
+    fn test_voice_instruction_serialization() {
+        let instruction = VoiceInstruction {
+            id: "custom".to_string(),
+            name: "自定义指令".to_string(),
+            description: Some("测试指令".to_string()),
+            prompt: "处理: {{text}}".to_string(),
+            shortcut: Some("CommandOrControl+1".to_string()),
+            is_preset: false,
+            icon: None,
+        };
+        let yaml = serde_yaml::to_string(&instruction).unwrap();
+        assert!(yaml.contains("id: custom"));
+        assert!(yaml.contains("{{text}}"));
+
+        let parsed: VoiceInstruction = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(parsed, instruction);
+    }
+
+    #[test]
+    fn test_credential_pool_with_asr() {
+        let pool = CredentialPoolConfig {
+            kiro: vec![],
+            gemini: vec![],
+            qwen: vec![],
+            openai: vec![],
+            claude: vec![],
+            gemini_api_keys: vec![],
+            vertex_api_keys: vec![],
+            codex: vec![],
+            asr: vec![AsrCredentialEntry {
+                id: "xunfei-1".to_string(),
+                provider: AsrProviderType::Xunfei,
+                name: Some("讯飞语音".to_string()),
+                is_default: false,
+                disabled: false,
+                language: "zh".to_string(),
+                whisper_config: None,
+                xunfei_config: Some(XunfeiConfig {
+                    app_id: "test_app_id".to_string(),
+                    api_key: "test_api_key".to_string(),
+                    api_secret: "test_api_secret".to_string(),
+                }),
+                baidu_config: None,
+                openai_config: None,
+            }],
+        };
+
+        let yaml = serde_yaml::to_string(&pool).unwrap();
+        assert!(yaml.contains("asr:"));
+        assert!(yaml.contains("provider: xunfei"));
+
+        let parsed: CredentialPoolConfig = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(parsed.asr.len(), 1);
+        assert_eq!(parsed.asr[0].provider, AsrProviderType::Xunfei);
     }
 }

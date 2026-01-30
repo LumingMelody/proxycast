@@ -224,6 +224,24 @@ pub fn close_screenshot_chat_window(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("关闭窗口失败: {}", e))
 }
 
+/// 打开带预填文本的输入框
+///
+/// 用于语音识别完成后，将识别结果填入输入框
+///
+/// # 参数
+/// - `app`: Tauri 应用句柄
+/// - `text`: 预填文本
+///
+/// # 返回
+/// 成功返回 Ok(()), 失败返回错误信息
+#[tauri::command]
+pub fn open_input_with_text(app: AppHandle, text: String) -> Result<(), String> {
+    info!("打开带预填文本的输入框: {} 字符", text.len());
+
+    crate::screenshot::window::open_floating_window_with_text(&app, &text)
+        .map_err(|e| format!("打开窗口失败: {}", e))
+}
+
 /// 读取图片文件并转换为 Base64
 ///
 /// 读取指定路径的图片文件，并将其内容编码为 Base64 字符串

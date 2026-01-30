@@ -4,7 +4,6 @@ use crate::services::context_memory_service::{
     ContextMemoryService, MemoryEntry, MemoryFileType, MemoryStats,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State;
 use tracing::{debug, info};

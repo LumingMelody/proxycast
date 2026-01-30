@@ -219,7 +219,7 @@ impl GeneralChatDao {
         before_id: Option<&str>,
     ) -> Result<Vec<ChatMessage>, rusqlite::Error> {
         let query = match (limit, before_id) {
-            (Some(lim), Some(bid)) => {
+            (Some(lim), Some(_bid)) => {
                 format!(
                     "SELECT id, session_id, role, content, blocks, status, created_at, metadata
                      FROM general_chat_messages

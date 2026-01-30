@@ -33,7 +33,6 @@ use crate::services::provider_pool_service::ProviderPoolService;
 use crate::services::token_cache_service::TokenCacheService;
 use crate::websocket::{WsConfig, WsConnectionManager, WsStats};
 use axum::{
-    body::Body,
     extract::{DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -999,14 +998,14 @@ async fn run_server(
         .route("/v1/chat/completions", post(
             |State(state): State<AppState>,
              headers: HeaderMap,
-             Json(mut request): Json<crate::models::openai::ChatCompletionRequest>| async {
+             Json(request): Json<crate::models::openai::ChatCompletionRequest>| async {
                 handlers::chat_completions(State(state), headers, Json(request)).await
             }
         ))
         .route("/v1/messages", post(
             |State(state): State<AppState>,
              headers: HeaderMap,
-             Json(mut request): Json<AnthropicMessagesRequest>| async {
+             Json(request): Json<AnthropicMessagesRequest>| async {
                 handlers::anthropic_messages(State(state), headers, Json(request)).await
             }
         ))

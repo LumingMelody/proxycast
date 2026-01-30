@@ -29,6 +29,7 @@ React 自定义 Hooks，封装业务逻辑和状态管理。
 - `useSwitch.ts` - 开关状态 Hook
 - `useTauri.ts` - Tauri 通用 Hook
 - `useWindowResize.ts` - 窗口大小 Hook
+- `useWorkspace.ts` - Workspace 工作目录管理 Hook
 
 ## 更新提醒
 

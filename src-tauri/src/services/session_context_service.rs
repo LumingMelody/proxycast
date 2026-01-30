@@ -3,12 +3,12 @@
 //! 提供会话上下文的持久化、恢复和智能管理功能，解决 AI 对话中的上下文丢失问题
 
 use crate::database::dao::general_chat::GeneralChatDao;
-use crate::services::general_chat::{ChatMessage, ChatSession, MessageRole};
+use crate::services::general_chat::{ChatMessage, MessageRole};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
 /// 会话上下文摘要
 #[derive(Debug, Clone, Serialize, Deserialize)]

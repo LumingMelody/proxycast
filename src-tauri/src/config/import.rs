@@ -375,6 +375,7 @@ impl ImportService {
             gemini_api_keys: imported.gemini_api_keys.clone(),
             vertex_api_keys: imported.vertex_api_keys.clone(),
             codex: Self::merge_credential_entries(&current.codex, &imported.codex),
+            asr: imported.asr.clone(),
         }
     }
 

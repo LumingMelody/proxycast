@@ -136,6 +136,39 @@ body,
   color: #5c3dbd;
 }
 
+/* 录音状态标签 */
+.screenshot-attachment.recording {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+}
+
+.screenshot-attachment.recording svg:first-child {
+  color: #ef4444;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* 处理状态标签 */
+.screenshot-attachment.processing {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #2563eb;
+}
+
+.screenshot-attachment.processing svg:first-child {
+  color: #3b82f6;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* 输入框 */
 .screenshot-input {
   flex: 1;
@@ -182,6 +215,26 @@ body,
 .screenshot-close-btn:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+/* 麦克风按钮 */
+.screenshot-mic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.screenshot-mic-btn:hover {
+  background: rgba(124, 77, 255, 0.1);
+  color: #7c4dff;
 }
 
 /* 工具按钮（+号菜单风格） */
@@ -275,6 +328,15 @@ body,
   .screenshot-close-btn:hover {
     background: rgba(239, 68, 68, 0.2);
     color: #f87171;
+  }
+
+  .screenshot-mic-btn {
+    color: #9ca3af;
+  }
+
+  .screenshot-mic-btn:hover {
+    background: rgba(124, 77, 255, 0.2);
+    color: #a78bfa;
   }
 
   .screenshot-tools-btn {

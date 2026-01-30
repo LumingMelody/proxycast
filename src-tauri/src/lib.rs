@@ -45,6 +45,8 @@ pub mod stream;
 pub mod terminal;
 pub mod translator;
 pub mod tray;
+pub mod voice;
+pub mod workspace;
 
 // 内部模块
 mod commands;

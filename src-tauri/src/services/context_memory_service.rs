@@ -6,9 +6,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// 记忆文件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

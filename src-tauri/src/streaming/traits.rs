@@ -9,8 +9,6 @@
 //! - 需求 1.3: OpenAICustomProvider 流式支持
 //! - 需求 1.4: AntigravityProvider 流式支持
 
-use crate::models::openai::ChatCompletionRequest;
-use crate::providers::ProviderError;
 use crate::streaming::StreamError;
 use async_trait::async_trait;
 use bytes::Bytes;

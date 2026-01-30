@@ -7,4 +7,4 @@ pub mod management_auth;
 #[cfg(test)]
 mod tests;
 
-pub use management_auth::{ManagementAuthLayer, ManagementAuthService};
+pub use management_auth::ManagementAuthLayer;

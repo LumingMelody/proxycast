@@ -18,10 +18,25 @@ const DropdownMenuContext = createContext<DropdownMenuContextType | undefined>(
 
 interface DropdownMenuProps {
   children: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
-  const [open, setOpen] = useState(false);
+const DropdownMenu: React.FC<DropdownMenuProps> = ({
+  children,
+  open: controlledOpen,
+  onOpenChange,
+}) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // 支持受控和非受控模式
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (controlledOpen === undefined) {
+      setInternalOpen(value);
+    }
+    onOpenChange?.(value);
+  };
 
   return (
     <DropdownMenuContext.Provider value={{ open, setOpen }}>
@@ -143,9 +158,20 @@ const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
   );
 };
 
+interface DropdownMenuSeparatorProps {
+  className?: string;
+}
+
+const DropdownMenuSeparator: React.FC<DropdownMenuSeparatorProps> = ({
+  className,
+}) => {
+  return <div className={cn("my-1 h-px bg-gray-200", className)} />;
+};
+
 export {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 };
