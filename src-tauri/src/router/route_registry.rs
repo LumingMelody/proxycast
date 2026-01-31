@@ -2,6 +2,8 @@
 //!
 //! 管理所有注册的路由，支持动态添加和查询。
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

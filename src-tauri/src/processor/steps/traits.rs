@@ -2,6 +2,8 @@
 //!
 //! 定义所有管道步骤必须实现的接口
 
+#![allow(dead_code)]
+
 use crate::processor::RequestContext;
 use async_trait::async_trait;
 use thiserror::Error;

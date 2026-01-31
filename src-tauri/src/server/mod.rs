@@ -1077,6 +1077,7 @@ async fn count_tokens(
 /// Gemini 原生协议处理
 /// 路由: POST /v1/gemini/{model}:{method}
 /// 例如: /v1/gemini/gemini-3-pro-preview:generateContent
+#[allow(dead_code)]
 async fn gemini_generate_content(
     State(state): State<AppState>,
     headers: HeaderMap,

@@ -12,6 +12,8 @@
 //! - 需求 2.5: 优雅处理错误并继续处理
 //! - 需求 2.6: 支持部分 chunk 的增量解析
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

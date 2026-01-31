@@ -18,6 +18,8 @@
 //! let router = AmpRouter::new(config);
 //!
 //! // 解析 provider 路由
+
+#![allow(dead_code)]
 //! let result = router.parse_provider_route("/api/provider/anthropic/v1/messages");
 //! assert!(result.is_some());
 //! ```

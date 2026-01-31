@@ -2,6 +2,8 @@
 //!
 //! 集成重试、故障转移和超时控制
 
+#![allow(dead_code)]
+
 use super::traits::{PipelineStep, StepError};
 use crate::processor::RequestContext;
 use crate::resilience::{

@@ -69,6 +69,7 @@ use crate::server_utils::{
 };
 use crate::session::store_thought_signature;
 use crate::stream::{PipelineConfig, StreamPipeline};
+use crate::streaming::traits::StreamingProvider;
 use crate::streaming::{
     StreamConfig, StreamContext, StreamError, StreamFormat as StreamingFormat, StreamManager,
     StreamResponse,

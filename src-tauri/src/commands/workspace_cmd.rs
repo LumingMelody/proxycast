@@ -22,6 +22,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 /// Workspace 管理器状态
+#[allow(dead_code)]
 pub struct WorkspaceManagerState(pub Arc<RwLock<Option<WorkspaceManager>>>);
 
 /// Workspace 列表项（前端展示用）

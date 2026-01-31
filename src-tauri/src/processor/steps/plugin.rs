@@ -2,6 +2,8 @@
 //!
 //! 执行插件的前置和后置钩子
 
+#![allow(dead_code)]
+
 use super::traits::{PipelineStep, StepError};
 use crate::plugin::PluginManager;
 use crate::processor::RequestContext;

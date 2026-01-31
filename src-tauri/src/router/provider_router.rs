@@ -2,6 +2,8 @@
 //!
 //! 解析请求路径，确定目标 Provider 和协议。
 
+#![allow(dead_code)]
+
 use super::route_registry::{RegisteredRoute, RouteRegistry, RouteType};
 use crate::models::provider_pool_model::PoolProviderType;
 use std::sync::Arc;

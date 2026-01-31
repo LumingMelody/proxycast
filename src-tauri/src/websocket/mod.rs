@@ -6,13 +6,14 @@
 //! - 流式响应转发
 //! - 心跳检测和连接生命周期管理
 
+#![allow(dead_code)]
+
 mod handler;
 mod lifecycle;
 mod processor;
 mod stream;
 mod types;
 
-pub use handler::ws_handler;
 pub use processor::MessageProcessor;
 pub use types::{
     KiroTokenInfo, WsApiRequest, WsApiResponse, WsConfig, WsConnection, WsEndpoint, WsError,

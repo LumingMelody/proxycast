@@ -2,6 +2,8 @@
 //!
 //! 定义请求处理过程中可能发生的错误
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// 处理错误

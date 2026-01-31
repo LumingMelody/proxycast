@@ -158,6 +158,7 @@ pub fn get_accessible_url(listen_host: &str, port: u16) -> String {
 ///
 /// # 返回
 /// 格式为 `http://{host}:{port}` 的 URL
+#[allow(dead_code)]
 pub fn get_local_url(listen_host: &str, port: u16) -> String {
     let host = match listen_host {
         "0.0.0.0" | "localhost" => "127.0.0.1".to_string(),

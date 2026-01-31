@@ -9,6 +9,8 @@
 //! - 需求 1.5: 流式传输开始时发送 `message_start` 和 `content_block_start` 事件
 //! - 需求 1.6: 流式传输完成时发送 `content_block_stop`、`message_delta` 和 `message_stop` 事件
 
+#![allow(dead_code)]
+
 use crate::streaming::aws_parser::AwsEvent;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

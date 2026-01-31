@@ -7,6 +7,8 @@
 //! - 需求 4.5: 跟踪 chunk 数量和接收的总字节数
 //! - 需求 7.5: 记录流式指标（吞吐量、延迟、错误率）
 
+#![allow(dead_code)]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::info;

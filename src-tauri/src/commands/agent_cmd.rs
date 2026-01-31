@@ -202,6 +202,7 @@ fn build_system_prompt_with_skills(
 }
 
 /// 图片输入参数
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ImageInputParam {
     pub data: String,

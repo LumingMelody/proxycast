@@ -2,6 +2,8 @@
 //!
 //! 根据配置的规则注入请求参数
 
+#![allow(dead_code)]
+
 use super::traits::{PipelineStep, StepError};
 use crate::injection::Injector;
 use crate::processor::RequestContext;

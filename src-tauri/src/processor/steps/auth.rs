@@ -2,6 +2,8 @@
 //!
 //! 验证请求的 API Key
 
+#![allow(dead_code)]
+
 use super::traits::{PipelineStep, StepError};
 use crate::processor::RequestContext;
 use async_trait::async_trait;

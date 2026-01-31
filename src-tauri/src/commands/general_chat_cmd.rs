@@ -230,6 +230,7 @@ use tokio::sync::RwLock;
 /// 流式消息事件
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(dead_code)]
 pub enum StreamEvent {
     /// 开始生成
     Start { message_id: String },
@@ -252,9 +253,11 @@ pub struct SendMessageRequest {
     pub event_name: String,
     /// Provider 配置（可选）
     #[serde(default)]
+    #[allow(dead_code)]
     pub provider: Option<String>,
     /// 模型名称（可选）
     #[serde(default)]
+    #[allow(dead_code)]
     pub model: Option<String>,
 }
 

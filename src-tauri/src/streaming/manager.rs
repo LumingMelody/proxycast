@@ -14,9 +14,12 @@
 //! - 需求 6.3: Provider 错误转发
 //! - 需求 6.5: 可配置的流式响应超时
 
-use crate::streaming::converter::StreamFormat;
+#![allow(dead_code)]
+
+use crate::streaming::converter::{StreamConverter, StreamFormat};
 use crate::streaming::error::StreamError;
 use crate::streaming::metrics::StreamMetrics;
+use crate::streaming::traits::StreamResponse;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};

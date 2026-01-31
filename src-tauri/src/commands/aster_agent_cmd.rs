@@ -191,6 +191,7 @@ pub struct AsterChatRequest {
     pub session_id: String,
     pub event_name: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub images: Option<Vec<ImageInput>>,
     /// Provider 配置（可选，如果未配置则使用当前配置）
     #[serde(default)]
@@ -198,6 +199,7 @@ pub struct AsterChatRequest {
 }
 
 /// 图片输入
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ImageInput {
     pub data: String,
@@ -356,6 +358,7 @@ pub async fn aster_session_get(session_id: String) -> Result<SessionDetail, Stri
 pub struct ConfirmRequest {
     pub request_id: String,
     pub confirmed: bool,
+    #[allow(dead_code)]
     pub response: Option<String>,
 }
 

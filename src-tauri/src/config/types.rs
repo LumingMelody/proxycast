@@ -230,6 +230,7 @@ pub struct VertexApiKeyEntry {
     pub disabled: bool,
 }
 
+#[allow(dead_code)]
 fn default_auth_type() -> String {
     "oauth".to_string()
 }
