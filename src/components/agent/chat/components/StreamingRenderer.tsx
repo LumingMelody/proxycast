@@ -206,6 +206,7 @@ const StreamingText: React.FC<StreamingTextProps> = memo(
             onA2UISubmit={onA2UISubmit}
             collapseCodeBlocks={collapseCodeBlocks}
             onCodeBlockClick={onCodeBlockClick}
+            isStreaming={isStreaming}
           />
         );
       }
@@ -256,6 +257,7 @@ const StreamingText: React.FC<StreamingTextProps> = memo(
                     onA2UISubmit={onA2UISubmit}
                     collapseCodeBlocks={collapseCodeBlocks}
                     onCodeBlockClick={onCodeBlockClick}
+                    isStreaming={isStreaming}
                   />
                 );
               }

@@ -1,0 +1,143 @@
+/**
+ * @file 代码高亮样式
+ * @description 基于 One Dark 主题的语法高亮 CSS
+ */
+
+/* 基础代码样式 */
+.code-renderer {
+  color: #abb2bf;
+}
+
+/* 关键字 */
+.code-renderer .token.keyword,
+.code-renderer .keyword {
+  color: #c678dd;
+}
+
+/* 字符串 */
+.code-renderer .token.string,
+.code-renderer .string {
+  color: #98c379;
+}
+
+/* 数字 */
+.code-renderer .token.number,
+.code-renderer .number {
+  color: #d19a66;
+}
+
+/* 注释 */
+.code-renderer .token.comment,
+.code-renderer .comment {
+  color: #5c6370;
+  font-style: italic;
+}
+
+/* 函数名 */
+.code-renderer .token.function,
+.code-renderer .function {
+  color: #61afef;
+}
+
+/* 类名 */
+.code-renderer .token.class-name,
+.code-renderer .class-name {
+  color: #e5c07b;
+}
+
+/* 操作符 */
+.code-renderer .token.operator,
+.code-renderer .operator {
+  color: #56b6c2;
+}
+
+/* 标点符号 */
+.code-renderer .token.punctuation,
+.code-renderer .punctuation {
+  color: #abb2bf;
+}
+
+/* 属性 */
+.code-renderer .token.property,
+.code-renderer .property {
+  color: #e06c75;
+}
+
+/* 变量 */
+.code-renderer .token.variable,
+.code-renderer .variable {
+  color: #e06c75;
+}
+
+/* 布尔值 */
+.code-renderer .token.boolean,
+.code-renderer .boolean {
+  color: #d19a66;
+}
+
+/* 正则表达式 */
+.code-renderer .token.regex,
+.code-renderer .regex {
+  color: #98c379;
+}
+
+/* 标签 (HTML/JSX) */
+.code-renderer .token.tag,
+.code-renderer .tag {
+  color: #e06c75;
+}
+
+/* 属性名 (HTML/JSX) */
+.code-renderer .token.attr-name,
+.code-renderer .attr-name {
+  color: #d19a66;
+}
+
+/* 属性值 (HTML/JSX) */
+.code-renderer .token.attr-value,
+.code-renderer .attr-value {
+  color: #98c379;
+}
+
+/* 内置函数 */
+.code-renderer .token.builtin,
+.code-renderer .builtin {
+  color: #e5c07b;
+}
+
+/* 常量 */
+.code-renderer .token.constant,
+.code-renderer .constant {
+  color: #d19a66;
+}
+
+/* 命名空间 */
+.code-renderer .token.namespace,
+.code-renderer .namespace {
+  color: #e5c07b;
+}
+
+/* 选择器 (CSS) */
+.code-renderer .token.selector,
+.code-renderer .selector {
+  color: #e06c75;
+}
+
+/* 重要 (CSS) */
+.code-renderer .token.important,
+.code-renderer .important {
+  color: #c678dd;
+  font-weight: bold;
+}
+
+/* 模板字符串 */
+.code-renderer .token.template-string,
+.code-renderer .template-string {
+  color: #98c379;
+}
+
+/* 插值 */
+.code-renderer .token.interpolation,
+.code-renderer .interpolation {
+  color: #e06c75;
+}

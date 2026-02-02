@@ -1,7 +1,7 @@
 {
   "name": "proxycast",
   "private": true,
-  "version": "0.51.0",
+  "version": "0.52.0",
   "type": "module",
   "repository": {
     "type": "git",
@@ -65,6 +65,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",
     "fabric": "^5.5.2",
+    "hast-util-to-html": "^9.0.5",
     "i18next": "^25.7.3",
     "jotai": "^2.16.1",
     "lodash-es": "^4.17.22",
@@ -77,6 +78,7 @@
     "react-resizable-panels": "^4.3.0",
     "react-router-dom": "^7.11.0",
     "react-syntax-highlighter": "^16.1.0",
+    "refractor": "^5.0.0",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",

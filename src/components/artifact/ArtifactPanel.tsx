@@ -150,6 +150,10 @@ export const ArtifactPanel: React.FC<ArtifactPanelProps> = memo(
     const [isResizing, setIsResizing] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [showSource, setShowSource] = useState(false);
+    const [viewMode, setViewMode] = useState<"source" | "preview">("source");
+    const [previewSize, setPreviewSize] = useState<
+      "mobile" | "tablet" | "desktop"
+    >("desktop");
 
     // Refs
     const panelRef = useRef<HTMLDivElement>(null);
@@ -264,6 +268,7 @@ export const ArtifactPanel: React.FC<ArtifactPanelProps> = memo(
       (id: string) => {
         dispatch({ type: "select", id });
         setShowSource(false); // 切换 artifact 时重置源码视图
+        setViewMode("source"); // 重置视图模式
       },
       [dispatch],
     );
@@ -274,6 +279,23 @@ export const ArtifactPanel: React.FC<ArtifactPanelProps> = memo(
     const handleToggleSource = useCallback(() => {
       setShowSource((prev) => !prev);
     }, []);
+
+    /**
+     * 切换视图模式（代码预览）
+     */
+    const handleViewModeChange = useCallback((mode: "source" | "preview") => {
+      setViewMode(mode);
+    }, []);
+
+    /**
+     * 切换预览尺寸
+     */
+    const handlePreviewSizeChange = useCallback(
+      (size: "mobile" | "tablet" | "desktop") => {
+        setPreviewSize(size);
+      },
+      [],
+    );
 
     /**
      * 关闭面板
@@ -366,12 +388,20 @@ export const ArtifactPanel: React.FC<ArtifactPanelProps> = memo(
                 showSource={showSource}
                 onToggleSource={handleToggleSource}
                 onClose={handleClose}
+                isStreaming={selectedArtifact.status === "streaming"}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
+                previewSize={previewSize}
+                onPreviewSizeChange={handlePreviewSizeChange}
               />
               {/* 渲染器 */}
               <div className="flex-1 overflow-auto">
                 <ArtifactRenderer
                   artifact={selectedArtifact}
                   isStreaming={selectedArtifact.status === "streaming"}
+                  hideToolbar={true}
+                  viewMode={viewMode}
+                  previewSize={previewSize}
                 />
               </div>
             </>

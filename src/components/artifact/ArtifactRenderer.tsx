@@ -184,6 +184,12 @@ export interface ArtifactRendererComponentProps extends ArtifactRendererProps {
   className?: string;
   /** 防抖延迟（毫秒），默认 100ms */
   debounceDelay?: number;
+  /** 是否隐藏内部工具栏 */
+  hideToolbar?: boolean;
+  /** 视图模式（用于代码预览） */
+  viewMode?: "source" | "preview";
+  /** 预览尺寸 */
+  previewSize?: "mobile" | "tablet" | "desktop";
 }
 
 /**
@@ -213,6 +219,9 @@ export const ArtifactRenderer: React.FC<ArtifactRendererComponentProps> = memo(
     onContentChange,
     className,
     debounceDelay = 100,
+    hideToolbar = false,
+    viewMode = "source",
+    previewSize = "desktop",
   }) => {
     // 错误状态管理
     const [renderError, setRenderError] = useState<Error | null>(null);
@@ -352,6 +361,9 @@ export const ArtifactRenderer: React.FC<ArtifactRendererComponentProps> = memo(
               artifact={debouncedArtifact}
               isStreaming={isStreaming}
               onContentChange={onContentChange}
+              hideToolbar={hideToolbar}
+              viewMode={viewMode}
+              previewSize={previewSize}
             />
           </ArtifactErrorBoundary>
         </Suspense>

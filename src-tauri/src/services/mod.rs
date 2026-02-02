@@ -1,4 +1,5 @@
 pub mod api_key_provider_service;
+pub mod aster_session_store;
 pub mod backup_service;
 pub mod context_memory_service;
 pub mod file_browser_service;

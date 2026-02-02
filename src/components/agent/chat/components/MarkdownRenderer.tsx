@@ -266,10 +266,18 @@ interface MarkdownRendererProps {
   collapseCodeBlocks?: boolean;
   /** 代码块点击回调（用于在画布中显示） */
   onCodeBlockClick?: (language: string, code: string) => void;
+  /** 是否正在流式生成 */
+  isStreaming?: boolean;
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(
-  ({ content, onA2UISubmit, collapseCodeBlocks = false, onCodeBlockClick }) => {
+  ({
+    content,
+    onA2UISubmit,
+    collapseCodeBlocks = false,
+    onCodeBlockClick,
+    isStreaming = false,
+  }) => {
     const [copied, setCopied] = React.useState<string | null>(null);
 
     const handleCopy = (code: string) => {
@@ -479,7 +487,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(
                   return (
                     <ArtifactPlaceholder
                       language={language}
-                      lineCount={lineCount}
+                      lineCount={isStreaming ? undefined : lineCount}
+                      isStreaming={isStreaming}
                       onClick={() => onCodeBlockClick?.(language, codeContent)}
                     />
                   );

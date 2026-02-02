@@ -37,6 +37,7 @@ use crate::logger;
 use crate::plugin;
 use crate::server;
 use crate::services::api_key_provider_service::ApiKeyProviderService;
+use crate::services::aster_session_store::ProxyCastSessionStore;
 use crate::services::context_memory_service::{ContextMemoryConfig, ContextMemoryService};
 use crate::services::provider_pool_service::ProviderPoolService;
 use crate::services::skill_service::SkillService;
@@ -219,6 +220,24 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
     ) = init_flow_monitor(&provider_pool_service_state, &db, &plugin_installer_state)?;
 
     // 其他状态
+    // 设置 Aster 全局 session store（使用 ProxyCast 数据库）
+    let session_store = Arc::new(ProxyCastSessionStore::new(db.clone()));
+    // 使用 tokio runtime 来设置全局 store
+    let rt = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
+        // 如果没有 runtime，创建一个临时的
+        tokio::runtime::Runtime::new().unwrap().handle().clone()
+    });
+    rt.block_on(async {
+        if let Err(e) = aster::session::set_global_session_store(session_store).await {
+            tracing::warn!(
+                "[Bootstrap] 设置全局 session store 失败（可能已设置）: {}",
+                e
+            );
+        } else {
+            tracing::info!("[Bootstrap] 已设置 Aster 全局 session store");
+        }
+    });
+
     let aster_agent_state = AsterAgentState::new();
     let orchestrator_state = OrchestratorState::new();
 

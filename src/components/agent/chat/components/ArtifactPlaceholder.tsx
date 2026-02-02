@@ -5,8 +5,13 @@
  */
 
 import React, { memo } from "react";
-import { FileCode, ExternalLink } from "lucide-react";
-import styled from "styled-components";
+import { FileCode, ExternalLink, Loader2 } from "lucide-react";
+import styled, { keyframes } from "styled-components";
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
 const PlaceholderCard = styled.div`
   display: flex;
@@ -55,6 +60,13 @@ const Subtitle = styled.div`
   font-size: 12px;
   color: hsl(var(--muted-foreground));
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const SpinningLoader = styled(Loader2)`
+  animation: ${spin} 1s linear infinite;
 `;
 
 const ActionIcon = styled.div`
@@ -71,6 +83,8 @@ interface ArtifactPlaceholderProps {
   language: string;
   /** 代码行数 */
   lineCount?: number;
+  /** 是否正在流式生成 */
+  isStreaming?: boolean;
   /** 点击回调 */
   onClick?: () => void;
 }
@@ -118,7 +132,7 @@ function getLanguageDisplayName(language: string): string {
  * 在聊天消息中显示代码块的简洁卡片
  */
 export const ArtifactPlaceholder: React.FC<ArtifactPlaceholderProps> = memo(
-  ({ language, lineCount, onClick }) => {
+  ({ language, lineCount, isStreaming = false, onClick }) => {
     const displayName = getLanguageDisplayName(language);
 
     return (
@@ -129,7 +143,16 @@ export const ArtifactPlaceholder: React.FC<ArtifactPlaceholderProps> = memo(
         <ContentWrapper>
           <Title>{displayName} 代码</Title>
           <Subtitle>
-            {lineCount ? `${lineCount} 行` : "点击在画布中查看"}
+            {isStreaming ? (
+              <>
+                <SpinningLoader size={12} />
+                <span>生成中...</span>
+              </>
+            ) : lineCount ? (
+              `${lineCount} 行`
+            ) : (
+              "点击在画布中查看"
+            )}
           </Subtitle>
         </ContentWrapper>
         <ActionIcon>

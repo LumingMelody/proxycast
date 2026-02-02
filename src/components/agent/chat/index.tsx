@@ -31,9 +31,13 @@ import {
   type CanvasState as GeneralCanvasState,
   DEFAULT_CANVAS_STATE,
 } from "@/components/general-chat/types";
-import { artifactsAtom, selectedArtifactAtom } from "@/lib/artifact/store";
+import {
+  artifactsAtom,
+  selectedArtifactAtom,
+  selectedArtifactIdAtom,
+} from "@/lib/artifact/store";
 import { ArtifactRenderer, ArtifactToolbar } from "@/components/artifact";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { createInitialMusicState } from "@/components/content-creator/canvas/music/types";
 import { parseLyrics } from "@/components/content-creator/canvas/music/utils/lyricsParser";
 import {
@@ -200,6 +204,15 @@ export function AgentChatPage({
   // Artifact 状态 - 用于在画布中显示
   const artifacts = useAtomValue(artifactsAtom);
   const selectedArtifact = useAtomValue(selectedArtifactAtom);
+  const setSelectedArtifactId = useSetAtom(selectedArtifactIdAtom);
+
+  // Artifact 预览状态
+  const [artifactViewMode, setArtifactViewMode] = useState<
+    "source" | "preview"
+  >("source");
+  const [artifactPreviewSize, setArtifactPreviewSize] = useState<
+    "mobile" | "tablet" | "desktop"
+  >("desktop");
 
   // 当有新的 artifact 时，自动打开画布
   useEffect(() => {
@@ -927,20 +940,36 @@ export function AgentChatPage({
   );
 
   // 处理代码块点击 - 在画布中显示代码（General 主题专用）
-  const handleCodeBlockClick = useCallback((language: string, code: string) => {
-    console.log("[AgentChatPage] 代码块点击:", language);
+  const handleCodeBlockClick = useCallback(
+    (language: string, code: string) => {
+      console.log("[AgentChatPage] 代码块点击:", language);
 
-    // 使用 General 画布显示代码
-    setGeneralCanvasState({
-      isOpen: true,
-      contentType: "code",
-      content: code,
-      language: language || "text",
-      filename: `代码片段.${language || "txt"}`,
-      isEditing: false,
-    });
-    setLayoutMode("chat-canvas");
-  }, []);
+      // 尝试找到匹配的 artifact（根据内容匹配）
+      const matchingArtifact = artifacts.find((a) => a.content === code);
+
+      if (matchingArtifact) {
+        // 如果找到匹配的 artifact，选中它
+        console.log(
+          "[AgentChatPage] 找到匹配的 artifact:",
+          matchingArtifact.id,
+        );
+        setSelectedArtifactId(matchingArtifact.id);
+      } else {
+        // 如果没有匹配的 artifact，使用 General 画布显示代码
+        console.log("[AgentChatPage] 未找到匹配的 artifact，使用 General 画布");
+        setGeneralCanvasState({
+          isOpen: true,
+          contentType: "code",
+          content: code,
+          language: language || "text",
+          filename: `代码片段.${language || "txt"}`,
+          isEditing: false,
+        });
+      }
+      setLayoutMode("chat-canvas");
+    },
+    [artifacts, setSelectedArtifactId],
+  );
 
   // 判断是否应该折叠代码块（当画布打开且有 artifact 时）
   const shouldCollapseCodeBlocks = useMemo(() => {
@@ -1139,12 +1168,20 @@ export function AgentChatPage({
           <ArtifactToolbar
             artifact={currentArtifact}
             onClose={handleCloseCanvas}
+            isStreaming={currentArtifact.status === "streaming"}
+            viewMode={artifactViewMode}
+            onViewModeChange={setArtifactViewMode}
+            previewSize={artifactPreviewSize}
+            onPreviewSizeChange={setArtifactPreviewSize}
           />
           {/* 渲染区域 */}
           <div className="flex-1 overflow-auto">
             <ArtifactRenderer
               artifact={currentArtifact}
               isStreaming={currentArtifact.status === "streaming"}
+              hideToolbar={true}
+              viewMode={artifactViewMode}
+              previewSize={artifactPreviewSize}
             />
           </div>
         </div>
@@ -1189,6 +1226,8 @@ export function AgentChatPage({
     mappedTheme,
     handleCloseCanvas,
     isSending,
+    artifactViewMode,
+    artifactPreviewSize,
   ]);
 
   // ========== 渲染逻辑 ==========

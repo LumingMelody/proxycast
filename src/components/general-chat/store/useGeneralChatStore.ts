@@ -623,6 +623,7 @@ export const useGeneralChatStore = create<GeneralChatState>()(
           streaming,
           currentSessionId,
           messages,
+          sessions,
           workflowManagers,
           workflowEnabled,
         } = get();
@@ -650,6 +651,38 @@ export const useGeneralChatStore = create<GeneralChatState>()(
           },
           streaming: { ...DEFAULT_STREAMING_STATE },
         }));
+
+        // 自动生成会话标题：当这是第一轮对话完成时（2条消息：用户+助手）
+        const currentSession = sessions.find((s) => s.id === currentSessionId);
+        if (updatedMessages.length === 2 && currentSession?.name === "新对话") {
+          // 获取第一条用户消息
+          const firstUserMessage = updatedMessages.find(
+            (m) => m.role === "user",
+          );
+          if (firstUserMessage) {
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              const title = await invoke<string>(
+                "general_chat_generate_title",
+                {
+                  request: {
+                    session_id: currentSessionId,
+                    first_message: firstUserMessage.content,
+                  },
+                },
+              );
+              // 更新本地会话标题
+              get().updateSession(currentSessionId, { name: title });
+            } catch (error) {
+              console.warn("自动生成标题失败:", error);
+              // 失败时使用简单截取
+              const fallbackTitle =
+                firstUserMessage.content.slice(0, 20) +
+                (firstUserMessage.content.length > 20 ? "..." : "");
+              get().updateSession(currentSessionId, { name: fallbackTitle });
+            }
+          }
+        }
 
         // 如果启用了工作流，执行 Post-Action 阶段
         const workflowManager = workflowManagers[currentSessionId];

@@ -402,3 +402,163 @@ pub async fn general_chat_stop_generation(session_id: String) -> Result<bool, St
         Ok(false)
     }
 }
+
+/// 自动生成会话标题请求
+#[derive(Debug, Deserialize)]
+pub struct GenerateTitleRequest {
+    /// 会话 ID
+    pub session_id: String,
+    /// 用户第一条消息内容
+    pub first_message: String,
+    /// Provider 名称（可选）
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// 模型名称（可选）
+    #[serde(default)]
+    pub model: Option<String>,
+}
+
+/// 自动生成会话标题
+///
+/// 基于用户第一条消息，调用 AI 生成简短的会话标题
+///
+/// # Arguments
+/// * `request` - 生成标题请求
+#[tauri::command]
+pub async fn general_chat_generate_title(
+    db: State<'_, DbConnection>,
+    request: GenerateTitleRequest,
+) -> Result<String, String> {
+    tracing::info!(
+        "[GeneralChat] 生成标题: session={}, message_len={}",
+        request.session_id,
+        request.first_message.len()
+    );
+
+    // 生成标题的 prompt
+    let prompt = format!(
+        "请根据以下用户消息，生成一个简短的对话标题（不超过15个字符，不要使用引号，直接输出标题）：\n\n{}",
+        request.first_message.chars().take(500).collect::<String>()
+    );
+
+    // 尝试调用 AI 生成标题
+    let title = match generate_title_with_ai(&prompt).await {
+        Ok(ai_title) => {
+            tracing::info!("[GeneralChat] AI 生成标题成功: {}", ai_title);
+            // 清理 AI 返回的标题（去除引号、换行等）
+            clean_title(&ai_title)
+        }
+        Err(e) => {
+            tracing::warn!("[GeneralChat] AI 生成标题失败，使用 fallback: {}", e);
+            // Fallback: 使用简单的截取逻辑
+            generate_fallback_title(&request.first_message)
+        }
+    };
+
+    // 更新数据库中的会话标题
+    {
+        let conn = db.lock().map_err(|e| format!("数据库锁定失败: {}", e))?;
+        GeneralChatDao::rename_session(&conn, &request.session_id, &title)
+            .map_err(|e| format!("更新标题失败: {}", e))?;
+    }
+
+    tracing::info!(
+        "[GeneralChat] 标题生成完成: session={}, title={}",
+        request.session_id,
+        title
+    );
+
+    Ok(title)
+}
+
+/// 使用 AI 生成标题
+async fn generate_title_with_ai(prompt: &str) -> Result<String, String> {
+    use crate::models::openai::{ChatCompletionRequest, ChatMessage, MessageContent};
+    use crate::providers::openai_custom::OpenAICustomProvider;
+
+    // 使用本地代理服务器调用 AI
+    // 这样可以利用已配置的凭证池
+    let provider = OpenAICustomProvider::with_config(
+        "local".to_string(),
+        Some("http://127.0.0.1:5678".to_string()),
+    );
+
+    let request = ChatCompletionRequest {
+        model: "default".to_string(), // 使用默认模型
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: Some(MessageContent::Text(prompt.to_string())),
+            tool_calls: None,
+            tool_call_id: None,
+            reasoning_content: None,
+        }],
+        temperature: Some(0.3),
+        max_tokens: Some(32),
+        top_p: None,
+        stream: false,
+        tools: None,
+        tool_choice: None,
+        reasoning_effort: None,
+    };
+
+    let resp = provider
+        .call_api(&request)
+        .await
+        .map_err(|e| format!("API 调用失败: {}", e))?;
+
+    let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+
+    if !status.is_success() {
+        return Err(format!("API 返回错误: {} - {}", status, body));
+    }
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("解析响应失败: {}", e))?;
+
+    let content = parsed["choices"]
+        .as_array()
+        .and_then(|arr| arr.first())
+        .and_then(|c| c["message"]["content"].as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if content.is_empty() {
+        return Err("AI 返回空内容".to_string());
+    }
+
+    Ok(content)
+}
+
+/// 清理 AI 生成的标题
+fn clean_title(title: &str) -> String {
+    let cleaned = title
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches('「')
+        .trim_matches('」')
+        .trim_matches('《')
+        .trim_matches('》')
+        .lines()
+        .next()
+        .unwrap_or(title)
+        .trim();
+
+    // 限制长度
+    if cleaned.chars().count() > 20 {
+        format!("{}...", cleaned.chars().take(17).collect::<String>())
+    } else {
+        cleaned.to_string()
+    }
+}
+
+/// 生成 fallback 标题
+fn generate_fallback_title(message: &str) -> String {
+    let trimmed = message.trim();
+    if trimmed.chars().count() > 20 {
+        format!("{}...", trimmed.chars().take(17).collect::<String>())
+    } else {
+        trimmed.to_string()
+    }
+}

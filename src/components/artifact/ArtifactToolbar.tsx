@@ -14,10 +14,22 @@ import {
   Eye,
   ExternalLink,
   X,
+  Smartphone,
+  Tablet,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { artifactRegistry } from "@/lib/artifact/registry";
 import type { Artifact } from "@/lib/artifact/types";
+
+/** 视图模式类型 */
+type ViewMode = "source" | "preview";
+
+/** 预览尺寸类型 */
+type PreviewSize = "mobile" | "tablet" | "desktop";
+
+/** 支持预览的语言列表 */
+const PREVIEWABLE_LANGUAGES = ["html", "svg"];
 
 /**
  * 工具栏按钮组件 Props
@@ -53,6 +65,61 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = memo(
 ToolbarButton.displayName = "ToolbarButton";
 
 /**
+ * 预览尺寸选择器组件
+ */
+interface SizeSelectorProps {
+  value: PreviewSize;
+  onChange: (value: PreviewSize) => void;
+}
+
+const SizeSelector: React.FC<SizeSelectorProps> = memo(
+  ({ value, onChange }) => (
+    <div className="inline-flex items-center rounded bg-white/5 p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange("mobile")}
+        className={cn(
+          "p-1 rounded transition-all",
+          value === "mobile"
+            ? "bg-white/10 text-white"
+            : "text-gray-500 hover:text-white",
+        )}
+        title="手机"
+      >
+        <Smartphone className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("tablet")}
+        className={cn(
+          "p-1 rounded transition-all",
+          value === "tablet"
+            ? "bg-white/10 text-white"
+            : "text-gray-500 hover:text-white",
+        )}
+        title="平板"
+      >
+        <Tablet className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("desktop")}
+        className={cn(
+          "p-1 rounded transition-all",
+          value === "desktop"
+            ? "bg-white/10 text-white"
+            : "text-gray-500 hover:text-white",
+        )}
+        title="桌面"
+      >
+        <Monitor className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  ),
+);
+SizeSelector.displayName = "SizeSelector";
+
+/**
  * ArtifactToolbar Props
  */
 export interface ArtifactToolbarProps {
@@ -64,6 +131,16 @@ export interface ArtifactToolbarProps {
   onToggleSource?: () => void;
   /** 关闭回调 */
   onClose?: () => void;
+  /** 是否正在流式生成 */
+  isStreaming?: boolean;
+  /** 当前视图模式（用于代码预览） */
+  viewMode?: ViewMode;
+  /** 视图模式变更回调 */
+  onViewModeChange?: (mode: ViewMode) => void;
+  /** 当前预览尺寸 */
+  previewSize?: PreviewSize;
+  /** 预览尺寸变更回调 */
+  onPreviewSizeChange?: (size: PreviewSize) => void;
 }
 
 /**
@@ -188,18 +265,39 @@ function sanitizeFilename(name: string): string {
  * - 在新窗口中打开 (Requirement 13.4)
  * - 关闭按钮 (Requirement 13.5)
  * - 紧凑的水平布局 (Requirement 13.6)
+ * - 代码行数显示和流式状态指示
  *
  * @param artifact - 要操作的 Artifact 对象
  * @param showSource - 当前是否显示源码视图
  * @param onToggleSource - 源码切换回调
  * @param onClose - 关闭回调
+ * @param isStreaming - 是否正在流式生成
+ * @param viewMode - 当前视图模式
+ * @param onViewModeChange - 视图模式变更回调
+ * @param previewSize - 当前预览尺寸
+ * @param onPreviewSizeChange - 预览尺寸变更回调
  */
 export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
-  ({ artifact, showSource = false, onToggleSource, onClose }) => {
+  ({
+    artifact,
+    showSource = false,
+    onToggleSource,
+    onClose,
+    isStreaming: _isStreaming = false,
+    viewMode = "source",
+    onViewModeChange,
+    previewSize = "desktop",
+    onPreviewSizeChange,
+  }) => {
     const [copied, setCopied] = useState(false);
 
     // 获取渲染器信息
     const entry = artifactRegistry.get(artifact.type);
+
+    // 判断是否是代码类型且支持预览
+    const isCode = artifact.type === "code";
+    const language = artifact.meta.language?.toLowerCase() || "";
+    const canPreview = isCode && PREVIEWABLE_LANGUAGES.includes(language);
 
     /**
      * 复制内容到剪贴板
@@ -233,12 +331,9 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
     const handleOpenInWindow = useCallback(() => {
       const win = window.open("", "_blank");
       if (win) {
-        // 根据类型决定如何显示内容
         if (artifact.type === "html") {
-          // HTML 直接渲染
           win.document.write(artifact.content);
         } else if (artifact.type === "svg") {
-          // SVG 直接渲染
           win.document.write(`
             <!DOCTYPE html>
             <html>
@@ -252,8 +347,10 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
               <body>${artifact.content}</body>
             </html>
           `);
+        } else if (isCode && canPreview) {
+          // 代码类型的 HTML/SVG 预览
+          win.document.write(artifact.content);
         } else {
-          // 其他类型显示为预格式化文本
           win.document.write(`
             <!DOCTYPE html>
             <html>
@@ -270,7 +367,7 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
         }
         win.document.close();
       }
-    }, [artifact]);
+    }, [artifact, isCode, canPreview]);
 
     /**
      * 切换源码视图
@@ -301,6 +398,10 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
               {entry.displayName}
             </span>
           )}
+          {/* 语言标签（代码类型） */}
+          {isCode && language && (
+            <span className="text-xs text-gray-500 font-mono">{language}</span>
+          )}
           {/* 标题 */}
           <span className="text-sm font-medium text-white truncate">
             {artifact.title}
@@ -309,6 +410,43 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
 
         {/* 操作按钮区域 */}
         <div className="flex items-center gap-0.5 shrink-0">
+          {/* 代码预览切换（仅 HTML/SVG 代码） */}
+          {canPreview && onViewModeChange && (
+            <div className="inline-flex items-center rounded bg-white/5 p-0.5 mr-1">
+              <button
+                type="button"
+                onClick={() => onViewModeChange("source")}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                  viewMode === "source"
+                    ? "bg-white/10 text-white"
+                    : "text-gray-400 hover:text-white",
+                )}
+                title="源码"
+              >
+                <Code className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("preview")}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                  viewMode === "preview"
+                    ? "bg-white/10 text-white"
+                    : "text-gray-400 hover:text-white",
+                )}
+                title="预览"
+              >
+                <Eye className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* 预览尺寸选择器 */}
+          {canPreview && viewMode === "preview" && onPreviewSizeChange && (
+            <SizeSelector value={previewSize} onChange={onPreviewSizeChange} />
+          )}
+
           {/* 复制按钮 */}
           <ToolbarButton
             onClick={handleCopy}
@@ -326,7 +464,7 @@ export const ArtifactToolbar: React.FC<ArtifactToolbarProps> = memo(
             <Download className="w-4 h-4" />
           </ToolbarButton>
 
-          {/* 源码切换按钮 */}
+          {/* 源码切换按钮（非代码类型） */}
           {supportsSourceToggle && (
             <ToolbarButton
               onClick={handleToggleSource}

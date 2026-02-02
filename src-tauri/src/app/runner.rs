@@ -1227,6 +1227,7 @@ pub fn run() {
             commands::general_chat_cmd::general_chat_add_message,
             commands::general_chat_cmd::general_chat_send_message,
             commands::general_chat_cmd::general_chat_stop_generation,
+            commands::general_chat_cmd::general_chat_generate_title,
             // Workspace commands
             commands::workspace_cmd::workspace_create,
             commands::workspace_cmd::workspace_list,

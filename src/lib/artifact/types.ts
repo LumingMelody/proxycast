@@ -100,6 +100,16 @@ export interface ArtifactRendererProps {
   isStreaming?: boolean;
   /** 内容变更回调（用于可编辑的渲染器） */
   onContentChange?: (content: string) => void;
+  /** 是否隐藏内部工具栏（当外部已有工具栏时使用） */
+  hideToolbar?: boolean;
+  /** 视图模式（用于代码预览） */
+  viewMode?: "source" | "preview";
+  /** 视图模式变更回调 */
+  onViewModeChange?: (mode: "source" | "preview") => void;
+  /** 预览尺寸 */
+  previewSize?: "mobile" | "tablet" | "desktop";
+  /** 预览尺寸变更回调 */
+  onPreviewSizeChange?: (size: "mobile" | "tablet" | "desktop") => void;
 }
 
 /**

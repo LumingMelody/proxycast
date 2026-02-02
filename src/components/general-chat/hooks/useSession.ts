@@ -175,16 +175,29 @@ export const useSession = (options: UseSessionOptions = {}) => {
 
   /**
    * 自动生成会话标题
-   * 基于第一条用户消息生成
+   * 基于第一条用户消息，调用 AI 生成简短标题
    */
   const generateTitle = useCallback(
     async (sessionId: string, firstMessage: string) => {
-      // 简单实现：截取前 20 个字符作为标题
-      const title =
-        firstMessage.slice(0, 20) + (firstMessage.length > 20 ? "..." : "");
-      await renameSession(sessionId, title);
+      try {
+        // 调用后端命令生成标题
+        const title = await invoke<string>("general_chat_generate_title", {
+          request: {
+            session_id: sessionId,
+            first_message: firstMessage,
+          },
+        });
+        // 更新本地状态
+        updateSession(sessionId, { name: title });
+      } catch (error) {
+        console.error("生成标题失败:", error);
+        // 失败时使用简单截取作为 fallback
+        const fallbackTitle =
+          firstMessage.slice(0, 20) + (firstMessage.length > 20 ? "..." : "");
+        await renameSession(sessionId, fallbackTitle);
+      }
     },
-    [renameSession],
+    [renameSession, updateSession],
   );
 
   // 自动加载会话列表
